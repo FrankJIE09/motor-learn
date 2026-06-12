@@ -1,0 +1,203 @@
+\chapter{电流力矩观测完整原理}
+\label{ch:current_torque}
+
+\section{WBC力控的根基：从电流到力矩}
+
+WBC和全身力控的基础，是\textbf{每个关节能精确输出期望力矩}。而大多数机器人在没有力矩传感器的情况下，唯一的力矩信息来源就是\textbf{电机电流}。
+
+\begin{equation}
+T_{\text{expected}} = K_t \cdot i_q
+\end{equation}
+
+其中$T_{\text{expected}}$是估算的电机电磁力矩，$K_t$是力矩常数（Nm/A），$i_q$是q轴电流。
+
+\begin{keyinsight}{电流力矩观测的三个假设}
+电流$\rightarrow$力矩的换算建立在三个假设之上：\\
+1. $K_t$是常数（实际上是温度和磁化的函数）\\
+2. $i_q$能准确反映电磁力矩（实际上有谐波和相位延迟）\\
+3. 电磁力矩全部传递到输出端（实际上被摩擦和各种非线性消耗）
+\end{keyinsight}
+
+\section{Kt力矩常数的真实意义}
+
+\subsection{Kt的定义}
+
+力矩常数$K_t$是电机电磁力矩与q轴电流之间的比例系数：
+
+\begin{equation}
+T_e = \frac{3}{2} \cdot \frac{P}{2} \cdot \lambda_{\text{PM}} \cdot i_q = K_t \cdot i_q
+\end{equation}
+
+其中$P$是极对数，$\lambda_{\text{PM}}$是永磁体磁链。
+
+对于SPMSM（表贴式），$K_t$在宽电流范围内保持较好的线性，这也是SPMSM成为力控首选的原因。
+
+\subsection{Kt的三大漂移因素}
+
+\begin{enumerate}
+  \item \textbf{温度漂移}（最显著）：
+  \begin{itemize}
+    \item 钕铁硼（NdFeB）永磁体的剩磁温度系数约为$-0.12\%/^\circ$C
+    \item 电机从冷机（$25^\circ$C）到热机（$80^\circ$C），$K_t$下降约6.6\%
+    \item 这意味着\textbf{相同电流在冷机和热机下输出力矩差6\%以上}
+    \item 你调好的力控参数，电机热了之后\textbf{自动变弱}
+  \end{itemize}
+  
+  \item \textbf{磁饱和}（大电流时）：
+  \begin{itemize}
+    \item 当电流超过额定值时，磁路饱和，$K_t$非线性下降
+    \item 典型地，2倍额定电流时$K_t$可能下降到标称值的85\%
+    \item 这在\textbf{冲击负载和碰撞}时最关键——你实际得到的大力矩比期望的小
+  \end{itemize}
+  
+  \item \textbf{制造公差}：
+  \begin{itemize}
+    \item 同型号电机之间，$K_t$可能有3--5\%的差异
+    \item 这意味着\textbf{左右腿使用同一个电流指令，输出力矩可能不一样}
+  \end{itemize}
+\end{enumerate}
+
+\begin{cautionbox}{Kt漂移导致的WBC对称性问题}
+WBC要保证左右腿对称出力。但如果左腿电机$K_t$比右腿大4\%，\\
+同样的电流指令下，左腿实际出力比右腿多4\%。\\
+你的WBC会检测到这个\textbf{假的"不平衡"}，然后用额外的控制力去补偿。\\
+结果？\textbf{一个腿出力越来越大，另一个越来越小——直到系统不稳定。}
+\end{cautionbox}
+
+\section{低减速比下的电流力矩观测——为什么可行}
+
+在低减速比（$i \leq 25$）下，电流力矩观测\textbf{可用}的原因：
+
+\subsection{误差放大倍数小}
+
+\begin{equation}
+T_{\text{out, expected}} = K_t \cdot i_q \cdot i \cdot \eta
+\end{equation}
+
+\textbf{误差传递}：
+\begin{itemize}
+  \item 电机端$K_t$误差 $\Delta K_t$ 导致关节端误差 $\Delta T_{\text{out}} = \Delta K_t \cdot i_q \cdot i$
+  \item 当$i=10$时，$\Delta K_t$的贡献被放大10倍——仍处于可控范围
+  \item 当$i=121$时，被放大121倍——远超可接受范围
+\end{itemize}
+
+\subsection{摩擦占比低}
+
+低减速比减速器的效率较高（90--97\%），摩擦力矩占额定力矩比例较低（3--8\%），摩擦补偿的残差可以被接受。
+
+\subsection{力控精度}
+
+在低减速比下，电流力矩观测的精度可以达到\textbf{5--10\%额定力矩}。这对于大多数WBC任务（行走、站立、操作）已经足够。
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lccc}
+\toprule
+\textbf{指标} & \textbf{直驱（i=1）} & \textbf{半直驱（i=10）} & \textbf{高减速比（i=121）} \\
+\midrule
+电流观测精度（\%额定力矩） & 1--3\% & 5--10\% & \textbf{30--50\%} \\
+摩擦占比 & $<1\%$ & 3--8\% & 10--20\% \\
+误差放大倍数 & 1 & 10 & \textbf{121} \\
+力控可行性 & 优秀 & 良好 & \textbf{不可行} \\
+\bottomrule
+\end{tabular}
+\caption{不同减速比下电流力矩观测对比}
+\label{tab:current_torque_compare}
+\end{table}
+
+\section{高减速比下电流力矩观测的失效原理}
+
+\subsection{失效原因1：误差放大}
+
+如第3章所述，所有电机端误差被减速比放大。对于$i=121$：
+
+\begin{equation}
+\Delta T_{\text{out}} \approx 121 \times (\Delta T_{\text{cogging}} + \Delta T_{\text{friction}} + \Delta T_{\text{Kt}} + \Delta T_{\text{noise}})
+\end{equation}
+
+每一项都乘了121。电机端看起来微不足道的误差，在关节端变成了\textbf{主导项}。
+
+\subsection{失效原因2：摩擦主导}
+
+\begin{equation}
+T_{\text{sensed}} = T_{\text{electromagnetic}} - T_{\text{friction}} - T_{\text{inertia}}
+\end{equation}
+
+在高减速比下，$T_{\text{friction}}$是$T_{\text{electromagnetic}}$的10--20\%，而且摩擦模型在低速下高度非线性（Stribeck效应）。\textbf{你根本无法准确减去摩擦力成分。}
+
+\subsection{失效原因3：扭转形变主导的误差}
+
+谐波减速器在力矩下扭转，这个扭转角改变气隙均匀度，进一步改变$K_t$。形成了\textbf{正反馈}：
+力矩$\rightarrow$扭转$\rightarrow$气隙变化$\rightarrow K_t$变化$\rightarrow$力矩观测误差$\rightarrow$控制器误判$\rightarrow$更大力矩...
+
+\begin{debugbox}{如何判断你的关节电流力矩观测是否有效}
+实验方法：\\
+1. 给关节一个恒定的电流指令\\
+2. 用外部力矩传感器测量实际关节输出力矩\\
+3. 对比两个值\\
+4. 如果偏差超过20\%额定力矩，\textbf{放弃电流力矩观测}\\
+5. 如果偏差在不同角度下变化超过10\%，说明\textbf{传动非线性占主导}
+\end{debugbox}
+
+\section{扰动观测器（DOB）与电流力矩观测的关系}
+
+DOB是电流力矩观测的\textbf{高级延伸}：
+
+\begin{equation}
+\hat{T}_{\text{dist}} = K_t \cdot i_q \cdot i - J \cdot \dot{\omega} - \hat{T}_{\text{friction}}
+\end{equation}
+
+DOB本质上在电流力矩观测的基础上，减去惯量项和摩擦项，得到"干扰力矩"。
+
+\begin{engineeringbox}{DOB在不同减速比下的有效性}
+\begin{itemize}
+  \item 低减速比：DOB有效，可以补偿大部分非线性
+  \item 中减速比：DOB精度有限，适合低频补偿
+  \item 高减速比：DOB\textbf{基本无效}——因为电流力矩观测本身就不准，误差被放大后远远大于实际干扰
+\end{itemize}
+\end{engineeringbox}
+
+\section{电流力矩观测的工程边界条件总结}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{c|c|c}
+\toprule
+\textbf{条件} & \textbf{电流力控可行} & \textbf{电流力控不可行} \\
+\midrule
+减速比 & $i \leq 25$ & $i \geq 80$ \\
+效率 & $\geq 90\%$ & $< 85\%$ \\
+摩擦占比 & $< 5\% T_{\text{rated}}$ & $> 10\% T_{\text{rated}}$ \\
+转矩脉动 & $< 1\%$ & $> 3\%$ \\
+温度稳定性 & 有温度补偿 & 无温度补偿 \\
+磁链线性度 & 额定电流内线性 & 饱和区工作 \\
+\bottomrule
+\end{tabular}
+\caption{电流力矩观测的工程边界条件}
+\label{tab:current_torque_boundary}
+\end{table}
+
+\section*{附录：电机电流与力矩换算公式速查}
+
+\begin{align}
+T_e &= \frac{3}{2} \cdot \frac{P}{2} \cdot \lambda_{\text{PM}} \cdot i_q \label{eq:tq1} \\
+K_t &= \frac{3}{2} \cdot \frac{P}{2} \cdot \lambda_{\text{PM}} \label{eq:kt1} \\
+T_{\text{out}} &= K_t \cdot i_q \cdot i \cdot \eta \label{eq:tout1} \\
+T_{\text{out, actual}} &= K_t(T) \cdot i_q \cdot i \cdot \eta - T_{\text{friction}}(\omega, T) - T_{\text{ripple}}(\theta) \label{eq:tactual1}
+\end{align}
+
+\section*{本章小结}
+\addcontentsline{toc}{section}{本章小结}
+
+\begin{summarybox}{}
+\begin{enumerate}
+  \item 电流力矩观测依赖三个假设，\textbf{在高减速比下三个假设全部失效}
+  \item $K_t$受温度、磁饱和、制造公差影响，\textbf{不是常数}
+  \item 低减速比（$i \leq 25$）电流观测精度5--10\%——够用
+  \item 高减速比（$i \geq 80$）电流观测精度30--50\%——\textbf{完全不可用}
+  \item DOB不是万能的——\textbf{输入不准，输出不可能准}
+  \item 最终结论：\textbf{高减速比关节做电流力矩观测是物理不可能}
+\end{enumerate}
+\end{summarybox}
+
+\newpage

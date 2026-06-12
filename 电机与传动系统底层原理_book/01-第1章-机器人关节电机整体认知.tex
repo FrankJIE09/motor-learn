@@ -1,0 +1,186 @@
+\chapter{机器人关节电机整体认知}
+\label{ch:overview}
+
+\section{为什么控制工程师需要懂电机}
+
+作为运动控制工程师，你每天的工作是编写WBC、力控、阻抗控制、动力学辨识算法。但你有没有想过：\textbf{你发的控制指令，电机真的能执行吗？}
+
+\begin{keyinsight}{控制与硬件的鸿沟}
+算法假定的是\textbf{理想力矩源}，而真实电机提供的是\textbf{带误差的力矩}。\\
+误差的大小取决于电机类型、结构和传动方式——这不是算法能弥补的。
+\end{keyinsight}
+
+大多数控制工程师的认知盲区是：把电机当成一个理想的力矩发生器，输入电流、输出力矩。但在机器人关节中，从\textbf{电流指令到末端力矩输出}之间，经过了电机自身电磁误差、减速器非线性、摩擦、齿隙、弹性形变等多重扭曲。
+
+\begin{engineeringbox}{本书核心前提}
+控制算法能落地的前提是：\textbf{你清楚地知道硬件能做什么、不能做什么。}\\
+如果你不知道关节的硬件边界，你所有的控制参数都是盲调。
+\end{engineeringbox}
+
+\section{机器人关节只用的三类电机}
+
+尽管市面上有上百种电机类型，但机器人关节中\textbf{只用了三类}永磁同步电机（PMSM）：
+
+\subsection{表贴式永磁同步电机（SPMSM）}
+
+这是\textbf{最主流}的机器人关节电机，宇树、特斯拉、波士顿动力等几乎所有机器人公司都在用。
+
+\begin{itemize}
+  \item \textbf{结构特点}：磁钢贴在转子表面，气隙均匀
+  \item \textbf{控制特性}：$L_d \approx L_q$，凸极效应极弱，$i_d=0$ 控制即可
+  \item \textbf{优势}：转矩线性度好、转矩脉动低、响应快
+  \item \textbf{劣势}：弱磁能力弱、最高转速受限
+\end{itemize}
+
+\begin{engineeringbox}{为什么SPMSM最适合力控}
+因为转矩线性度好——电流和力矩的关系$T = K_t \cdot i$在宽范围内保持线性。\\
+这是你能用\textbf{电流做力矩观测}的根本前提。
+\end{engineeringbox}
+
+\subsection{内置式永磁同步电机（IPMSM）}
+
+磁钢嵌入转子内部，$L_q > L_d$，利用磁阻转矩。
+
+\begin{itemize}
+  \item \textbf{控制特性}：需要MTPA（最大转矩电流比）控制，$i_d \neq 0$
+  \item \textbf{优势}：扭矩密度更高、弱磁扩速能力好
+  \item \textbf{劣势}：转矩线性度差，控制更复杂
+\end{itemize}
+
+IPMSM在机器人中\textbf{应用较少}，主要因为转矩线性度差，不利于精确力控。
+
+\subsection{空心杯电机（Slotless PMSM）}
+
+\begin{itemize}
+  \item \textbf{结构特点}：无铁芯绕组，零齿槽转矩
+  \item \textbf{优势}：转矩脉动极低、零齿槽效应、响应极快
+  \item \textbf{劣势}：扭矩密度低、散热差、成本高
+  \item \textbf{应用}：小型灵巧手、手术机器人等需要\textbf{超平滑力控}的场景
+\end{itemize}
+
+\section{运动控制工程师必须懂的三大电机指标}
+
+不是所有电机参数都对你有用。下面三个是\textbf{直接影响你控制算法效果}的核心指标：
+
+\subsection{惯量（Inertia）}
+
+电机转子的转动惯量$J_m$决定了\textbf{电机对力矩指令的加速度响应}：
+
+\begin{equation}
+\alpha = \frac{T}{J_m + J_{\text{load}}}
+\end{equation}
+
+\textbf{对你工作的影响}：
+
+\begin{itemize}
+  \item \textbf{低惯量电机}：加速度大，响应快，适合高频力控和碰撞检测
+  \item \textbf{高惯量电机}：响应慢，但有更好的抗负载扰动能力
+  \item 惯量匹配问题：负载惯量与电机惯量的比值$J_{\text{load}}/J_m$影响系统稳定性
+\end{itemize}
+
+\begin{engineeringbox}{惯量与柔顺力控的关系}
+低惯量电机（如宇树H1使用的）可以实现更快的力控带宽，因为机械时间常数小。\\
+高减速比关节下，折算到电机侧的负载惯量被\textbf{除以$i^2$}，所以高减速比关节对负载扰动不敏感，但也\textbf{失去了力控所需的柔顺性}。
+\end{engineeringbox}
+
+\subsection{扭矩密度（Torque Density）}
+
+单位体积或重量能输出的最大扭矩。对机器人而言，扭矩密度决定了：
+
+\begin{itemize}
+  \item \textbf{关节能否做动态平衡}——扭矩密度不够，机器人站不稳
+  \item \textbf{抗冲击能力}——跌落/碰撞时，电机能否提供足够的反向力矩
+  \item \textbf{整机重量}——扭矩密度越高，关节就可以做越轻
+\end{itemize}
+
+\begin{industrybox}{行业对比}
+\begin{table}[H]
+\centering
+\begin{tabular}{lcc}
+\toprule
+\textbf{电机类型} & \textbf{扭矩密度（Nm/kg）} & \textbf{适用场景} \\
+\midrule
+SPMSM（机器人级） & 1.5--3.0 & 人形/四足关节 \\
+IPMSM（车用级） & 3.0--5.0 & 电动汽车 \\
+空心杯 & 0.5--1.0 & 灵巧手 \\
+\bottomrule
+\end{tabular}
+\caption{不同电机扭矩密度对比}
+\label{tab:torque_density}
+\end{table}
+\end{industrybox}
+
+\subsection{转矩脉动（Torque Ripple）}
+
+这是\textbf{最被控制工程师忽视但最致命}的指标。
+
+转矩脉动是电机在匀速旋转时，输出力矩的周期性波动。来源包括：
+
+\begin{itemize}
+  \item 齿槽转矩（cogging torque）——定子齿与永磁体之间的磁阻变化
+  \item 谐波反电动势——绕组分布不完美导致
+  \item 电流测量噪声——经控制环放大后体现为力矩波动
+\end{itemize}
+
+\begin{cautionbox}{转矩脉动与WBC抖动}
+WBC对每个关节的力矩指令在高速切换（500--1000 Hz）。\\
+如果电机本身有5\%的转矩脉动，这个脉动会直接体现在关节输出端。\\
+\textbf{你调了很久的WBC抖动，可能根本不是算法问题，而是电机转矩脉动导致的。}
+\end{cautionbox}
+
+\section{工业电机 vs 机器人电机——为什么不能互换}
+
+你可能想问：为什么不能用工业伺服电机做机器人？答案在下面这张对比表：
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lp{4cm}p{4cm}p{4cm}}
+\toprule
+\textbf{指标} & \textbf{工业伺服电机} & \textbf{机器人关节电机} & \textbf{为什么} \\
+\midrule
+惯量 & 中-高 & \textbf{极低} & 机器人需要快速启停和力控 \\
+扭矩密度 & 中等 & \textbf{极高} & 机器人自重限制 \\
+转矩脉动 & 1--3\% & \textbf{$<$1\%} & WBC对力矩波动敏感 \\
+过载能力 & 1.5--2倍 & \textbf{2--3倍} & 机器人冲击载荷大 \\
+工作制 & S1（连续） & S2/S3（断续） & 机器人是间歇运动 \\
+散热 & 风冷/水冷 & \textbf{自然冷却+本体散热} & 无额外散热空间 \\
+\bottomrule
+\end{tabular}
+\caption{工业电机 vs 机器人电机核心差异}
+\label{tab:ind_vs_robot}
+\end{table}
+
+\section{电机选型对控制策略的决定性影响}
+
+不同的电机参数组合，决定了你能用什么样的控制策略：
+
+\begin{table}[H]
+\centering
+\begin{tabular}{cp{3.5cm}p{3.5cm}p{3.5cm}}
+\toprule
+\textbf{电机特征} & \textbf{适合的控制策略} & \textbf{不适合的策略} & \textbf{代表产品} \\
+\midrule
+低惯量+低脉动 & 力控、阻抗控制、WBC & --- & 宇树M系列 \\
+高惯量+高扭矩密度 & 位置控制、轨迹跟踪 & 柔顺力控 & 工业机器人 \\
+低扭矩密度 & 轻载力控 & 重载抗冲击 & 灵巧手 \\
+高脉动 & --- & 精细力控、WBC & 改装工业电机 \\
+\bottomrule
+\end{tabular}
+\caption{电机特征与控制策略匹配}
+\label{tab:motor_ctrl_match}
+\end{table}
+
+\section*{本章小结}
+\addcontentsline{toc}{section}{本章小结}
+
+\begin{summarybox}{}
+\begin{enumerate}
+  \item 机器人关节只用\textbf{三类PMSM}：SPMSM（主流）、IPMSM（少见）、空心杯（特殊场景）
+  \item 控制工程师必须关注的三大指标：\textbf{惯量、扭矩密度、转矩脉动}
+  \item 低惯量电机是力控的前提、高扭矩密度是动态平衡的保障、低脉动是WBC不抖动的必要条件
+  \item \textbf{工业电机和机器人电机不能互换}——核心差异在惯量、扭矩密度和转矩脉动
+  \item 电机本体的参数直接决定了\textbf{你能用什么控制策略、不能用什么控制策略}
+\end{enumerate}
+\end{summarybox}
+
+\newpage

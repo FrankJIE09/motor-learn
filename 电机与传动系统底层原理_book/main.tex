@@ -1,0 +1,116 @@
+\documentclass[UTF8,a4paper,12pt]{ctexbook}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{geometry}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{xcolor}
+\usepackage{tcolorbox}
+\usepackage{enumitem}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{colortbl}
+\usepackage{makecell}
+\usepackage{float}
+\usepackage{caption}
+
+\geometry{a4paper,margin=2.5cm}
+
+% 定义颜色
+\definecolor{primaryblue}{RGB}{0, 82, 136}
+\definecolor{accentorange}{RGB}{230, 126, 34}
+\definecolor{successgreen}{RGB}{39, 174, 96}
+\definecolor{warnred}{RGB}{192, 57, 43}
+\definecolor{infoyellow}{RGB}{243, 156, 18}
+\definecolor{lightgray}{RGB}{245, 245, 245}
+\definecolor{chaptercolor}{RGB}{0, 60, 100}
+\definecolor{keybg}{RGB}{235, 245, 235}
+\definecolor{warnbg}{RGB}{250, 235, 235}
+
+% 定义提示框环境
+\newtcolorbox{engineeringbox}[2][]{
+  colback=lightgray,
+  colframe=primaryblue,
+  fonttitle=\bfseries,
+  title={工程重点：#2},
+  #1
+}
+
+\newtcolorbox{cautionbox}[2][]{
+  colback=warnbg,
+  colframe=warnred,
+  fonttitle=\bfseries,
+  title={控制坑点：#2},
+  #1
+}
+
+\newtcolorbox{debugbox}[2][]{
+  colback=white,
+  colframe=accentorange,
+  fonttitle=\bfseries,
+  title={真机调试：#2},
+  #1
+}
+
+\newtcolorbox{keyinsight}[2][]{
+  colback=keybg,
+  colframe=successgreen,
+  fonttitle=\bfseries,
+  title={核心认知：#2},
+  #1
+}
+
+\newtcolorbox{summarybox}[2][]{
+  colback=white,
+  colframe=chaptercolor,
+  fonttitle=\bfseries,
+  title={本章小结},
+  #1
+}
+
+\newtcolorbox{industrybox}[2][]{
+  colback=white,
+  colframe=infoyellow,
+  fonttitle=\bfseries,
+  title={行业对比：#2},
+  #1
+}
+
+% 章节格式
+\titleformat{\chapter}{\Huge\bfseries\color{chaptercolor}}{第\thechapter 章}{20pt}{\Huge\bfseries}
+\titleformat{\section}{\Large\bfseries\color{primaryblue}}{\thesection}{15pt}{\Large\bfseries}
+\titleformat{\subsection}{\large\bfseries}{\thesubsection}{12pt}{\large\bfseries}
+
+% 页眉页脚
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[LE,RO]{\leftmark}
+\fancyfoot[C]{\thepage}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=primaryblue,
+  urlcolor=accentorange,
+  citecolor=successgreen,
+}
+
+\setlength{\parindent}{2em}
+\setlength{\parskip}{0.5em}
+
+\begin{document}
+
+\input{封面-前言.tex}
+
+\input{01-第1章-机器人关节电机整体认知.tex}
+\input{02-第2章-永磁同步电机内部结构.tex}
+\input{03-第3章-减速器系统核心理论.tex}
+\input{04-第4章-电流力矩观测完整原理.tex}
+\input{05-第5章-双编码器系统工作原理.tex}
+\input{06-第6章-高减速比关节控制失效分析.tex}
+\input{07-第7章-主流机器人关节方案横向对比.tex}
+\input{08-第8章-运动控制工程师的硬件选型标准.tex}
+\input{09-第9章-域随机化在关节控制中的应用.tex}
+
+\end{document}

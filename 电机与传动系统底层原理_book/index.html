@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>电机与传动系统底层原理 - 可视化全景图</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  background: #0a0e17;
+  color: #e0e6f0;
+  line-height: 1.7;
+}
+.hero {
+  background: linear-gradient(135deg, #0f1923 0%, #1a2a3a 50%, #0d1f2e 100%);
+  padding: 80px 20px 60px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+.hero::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle at 50% 50%, rgba(0,180,255,0.05) 0%, transparent 50%);
+  animation: pulse 8s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 0.3; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(1.1); }
+}
+.hero h1 {
+  font-size: 2.8em;
+  font-weight: 800;
+  background: linear-gradient(135deg, #60b0ff, #00d4ff);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  position: relative;
+  letter-spacing: 2px;
+  margin-bottom: 16px;
+}
+.hero p {
+  font-size: 1.15em;
+  color: #8899aa;
+  max-width: 700px;
+  margin: 0 auto;
+  position: relative;
+  line-height: 1.8;
+}
+.system-map {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 40px 20px;
+}
+.section-title {
+  text-align: center;
+  font-size: 1.6em;
+  font-weight: 700;
+  margin-bottom: 12px;
+  color: #c0d0e0;
+}
+.section-subtitle {
+  text-align: center;
+  color: #6a7a8a;
+  margin-bottom: 40px;
+  font-size: 1em;
+}
+.module-grid {
+  display: grid;
+  gap: 24px;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+}
+.module-card {
+  background: linear-gradient(145deg, #141e2a, #1a2533);
+  border-radius: 16px;
+  border: 1px solid #1e2d3d;
+  overflow: hidden;
+  transition: transform 0.3s, box-shadow 0.3s;
+}
+.module-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px rgba(0,120,255,0.12);
+  border-color: #2a4055;
+}
+.model-viewer {
+  width: 100%;
+  height: 280px;
+  background: #0d1420;
+}
+.model-viewer iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+.card-content {
+  padding: 24px;
+}
+.module-badge {
+  display: inline-block;
+  padding: 3px 12px;
+  border-radius: 20px;
+  font-size: 0.78em;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+.badge-motor { background: rgba(0,180,255,0.15); color: #60c8ff; }
+.badge-gear { background: rgba(255,180,0,0.15); color: #ffc040; }
+.badge-control { background: rgba(0,220,120,0.15); color: #40e890; }
+.badge-sensor { background: rgba(200,100,255,0.15); color: #c080ff; }
+.badge-system { background: rgba(255,80,80,0.15); color: #ff7070; }
+.badge-app { background: rgba(255,140,0,0.15); color: #ffa040; }
+.card-content h3 {
+  font-size: 1.25em;
+  font-weight: 700;
+  margin-bottom: 8px;
+  color: #d0e0f0;
+}
+.card-content p {
+  font-size: 0.92em;
+  color: #8a9aaa;
+  margin-bottom: 12px;
+}
+.key-formula {
+  background: rgba(0,100,200,0.08);
+  border-left: 3px solid #0088dd;
+  padding: 10px 16px;
+  border-radius: 0 8px 8px 0;
+  margin: 10px 0;
+  font-family: 'Courier New', monospace;
+  font-size: 0.9em;
+  color: #80c0ff;
+}
+.stats-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+.stat-item {
+  background: rgba(255,255,255,0.04);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 0.82em;
+  color: #7a8a9a;
+}
+.stat-item strong { color: #b0c0d0; }
+.flow-section {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 50px 20px;
+}
+.flow-title {
+  text-align: center;
+  font-size: 1.5em;
+  font-weight: 700;
+  margin-bottom: 30px;
+  color: #b0c8e0;
+}
+.flow-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.flow-node {
+  background: linear-gradient(145deg, #162230, #1e2e40);
+  border: 1px solid #2a4055;
+  border-radius: 12px;
+  padding: 14px 22px;
+  text-align: center;
+  min-width: 110px;
+  transition: all 0.3s;
+}
+.flow-node:hover {
+  border-color: #4080c0;
+  transform: translateY(-2px);
+}
+.flow-node .icon { font-size: 1.6em; margin-bottom: 4px; }
+.flow-node .label { font-size: 0.82em; color: #8aaabc; font-weight: 600; }
+.flow-node .sub { font-size: 0.72em; color: #5a7a8a; margin-top: 2px; }
+.flow-arrow {
+  font-size: 1.4em;
+  color: #3a5a7a;
+  flex-shrink: 0;
+}
+.case-section {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 50px 20px;
+}
+.case-grid {
+  display: grid;
+  gap: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+}
+.case-card {
+  background: linear-gradient(145deg, #141e2a, #1a2533);
+  border: 1px solid #1e2d3d;
+  border-radius: 14px;
+  padding: 24px;
+  transition: border-color 0.3s;
+}
+.case-card:hover { border-color: #2a4055; }
+.case-card h4 {
+  font-size: 1.1em;
+  margin-bottom: 8px;
+  color: #c0d8f0;
+}
+.case-card .spec {
+  font-size: 0.85em;
+  color: #6a8aaa;
+  margin-bottom: 4px;
+}
+.case-card .spec strong { color: #90b0d0; }
+.footer {
+  text-align: center;
+  padding: 40px 20px;
+  color: #4a5a6a;
+  font-size: 0.85em;
+  border-top: 1px solid #1a2530;
+}
+@media (max-width: 768px) {
+  .hero h1 { font-size: 1.8em; }
+  .module-grid { grid-template-columns: 1fr; }
+  .flow-container { gap: 4px; }
+  .flow-node { padding: 10px 14px; min-width: 80px; }
+  .flow-arrow { font-size: 1em; }
+  .model-viewer { height: 220px; }
+}
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <h1>电机与传动系统底层原理</h1>
+  <p>从电流到运动的完整技术栈 — PMSM 电机建模 · 减速传动 · 转矩控制 · 力觉感知 · 机器人系统集成</p>
+</div>
+
+<div class="system-map">
+  <h2 class="section-title">核心模块总览</h2>
+  <p class="section-subtitle">点击/拖拽 3D 模型可自由旋转查看各模块结构</p>
+
+  <div class="module-grid">
+
+    <!-- 模块 1: PMSM 电机 -->
+    <div class="module-card">
+      <div class="model-viewer">
+        <iframe src="https://sketchfab.com/models/bf200d56df40421ba0ccb38d5e8f732a/embed?autostart=1&internal=1&tracking=0&ui_ar=0&ui_infos=0&ui_snapshots=0&ui_stop=0&ui_theatre=0&ui_watermark=0&ui_hint=2&autospin=0.2" allow="autoplay; fullscreen" allowfullscreen></iframe>
+      </div>
+      <div class="card-content">
+        <span class="module-badge badge-motor">PMSM 电机</span>
+        <h3>永磁同步电机 (SPMSM / IPMSM)</h3>
+        <p>由定子绕组产生旋转磁场，与转子永磁体相互作用产生电磁转矩。SPMSM 表面粘贴磁体，L<sub>d</sub> ≈ L<sub>q</sub>；IPMSM 磁体内嵌，L<sub>q</sub> &gt; L<sub>d</sub>，可利用磁阻转矩。</p>
+        <div class="key-formula">T<sub>e</sub> = 3/2 · (P/2) · λ<sub>PM</sub> · i<sub>q</sub> = K<sub>t</sub> · i<sub>q</sub></div>
+        <div class="stats-row">
+          <span class="stat-item"><strong>SPMSM</strong> 1.5–3.0 Nm/kg</span>
+          <span class="stat-item"><strong>IPMSM</strong> 3.0–5.0 Nm/kg</span>
+          <span class="stat-item"><strong>K<sub>t</sub></strong> 3–5% 波动</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 模块 2: Slotless / BLDC -->
+    <div class="module-card">
+      <div class="model-viewer">
+        <iframe src="https://sketchfab.com/models/a9294a35fd4643169619bbda1a921225/embed?autostart=1&internal=1&tracking=0&ui_ar=0&ui_infos=0&ui_snapshots=0&ui_stop=0&ui_theatre=0&ui_watermark=0&ui_hint=2&autospin=0.2" allow="autoplay; fullscreen" allowfullscreen></iframe>
+      </div>
+      <div class="card-content">
+        <span class="module-badge badge-motor">BLDC / Slotless</span>
+        <h3>无刷直流 &amp; 无槽电机</h3>
+        <p>BLDC 采用电子换向代替机械电刷。无槽 (Slotless) 电机定子无齿槽，彻底消除齿槽转矩 (cogging torque)，实现极低转矩脉动，适用于高精度力控场景。</p>
+        <div class="stats-row">
+          <span class="stat-item"><strong>转矩脉动</strong> &lt; 1% (WBC)</span>
+          <span class="stat-item"><strong>Slotless</strong> 零 cogging</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 模块 3: 谐波减速器 -->
+    <div class="module-card">
+      <div class="model-viewer">
+        <iframe src="https://sketchfab.com/models/9e05993e1ef24ff2a8ea2107b45765d0/embed?autostart=1&internal=1&tracking=0&ui_ar=0&ui_infos=0&ui_snapshots=0&ui_stop=0&ui_theatre=0&ui_watermark=0&ui_hint=2&autospin=0.2" allow="autoplay; fullscreen" allowfullscreen></iframe>
+      </div>
+      <div class="card-content">
+        <span class="module-badge badge-gear">谐波减速器</span>
+        <h3>Harmonic Drive &amp; 精密传动</h3>
+        <p>利用柔轮弹性变形实现高减速比单级传动。零背隙、高刚度 (10<sup>3</sup>–10<sup>4</sup> Nm/rad)，减速比 30:1–160:1，效率 70–85%。适用于高精度机器人关节。</p>
+        <div class="key-formula">T<sub>out</sub> = T<sub>motor</sub> × i × η &nbsp; ω<sub>out</sub> = ω<sub>motor</sub> / i</div>
+        <div class="stats-row">
+          <span class="stat-item"><strong>减速比</strong> 30–160</span>
+          <span class="stat-item"><strong>效率</strong> 70–85%</span>
+          <span class="stat-item"><strong>背隙</strong> ≈ 0</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 模块 4: 齿轮传动 -->
+    <div class="module-card">
+      <div class="model-viewer">
+        <iframe src="https://sketchfab.com/models/62795d3a16d746828f94be53b828e1c4/embed?autostart=1&internal=1&tracking=0&ui_ar=0&ui_infos=0&ui_snapshots=0&ui_stop=0&ui_theatre=0&ui_watermark=0&ui_hint=2&autospin=0.2" allow="autoplay; fullscreen" allowfullscreen></iframe>
+      </div>
+      <div class="card-content">
+        <span class="module-badge badge-gear">齿轮传动系统</span>
+        <h3>行星齿轮 · 直齿轮 · 准直驱 (QDD)</h3>
+        <p>行星减速器减速比 3:1–100:1，效率 90–97%。准直驱 (QDD) 采用 6:1–15:1 低减速比 + 大转矩电机，兼顾反向驱动性与力控精度。</p>
+        <div class="stats-row">
+          <span class="stat-item"><strong>行星</strong> 3–100:1 / 90–97%</span>
+          <span class="stat-item"><strong>QDD</strong> 6–15:1 / 85–95%</span>
+          <span class="stat-item"><strong>直驱</strong> 1:1 / ≈100%</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 模块 5: FOC 矢量控制 -->
+    <div class="module-card">
+      <div class="model-viewer">
+        <iframe src="https://sketchfab.com/models/2926b5bfc3d342d988dc1baf06c8aa84/embed?autostart=1&internal=1&tracking=0&ui_ar=0&ui_infos=0&ui_snapshots=0&ui_stop=0&ui_theatre=0&ui_watermark=0&ui_hint=2&autospin=0.2" allow="autoplay; fullscreen" allowfullscreen></iframe>
+      </div>
+      <div class="card-content">
+        <span class="module-badge badge-control">FOC 矢量控制</span>
+        <h3>磁场定向控制 &amp; 电流环</h3>
+        <p>通过 Park / Clarke 变换将三相电流解耦为 d-q 轴分量。i<sub>d</sub> 控制励磁，i<sub>q</sub> 控制转矩。SPMSM 采用 i<sub>d</sub>=0 控制，IPMSM 采用 MTPA 策略。</p>
+        <div class="key-formula">T = K<sub>t</sub> · i<sub>q</sub> &nbsp;→&nbsp; T<sub>out</sub> = K<sub>t</sub> · i<sub>q</sub> · i · η</div>
+        <div class="stats-row">
+          <span class="stat-item"><strong>电流环</strong> &gt; 10 kHz</span>
+          <span class="stat-item"><strong>编码器</strong> 219 线/转</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 模块 6: 转矩控制 -->
+    <div class="module-card">
+      <div class="model-viewer">
+        <iframe src="https://sketchfab.com/models/bd5e4fb4da604041962d4f4963027fde/embed?autostart=1&internal=1&tracking=0&ui_ar=0&ui_infos=0&ui_snapshots=0&ui_stop=0&ui_theatre=0&ui_watermark=0&ui_hint=2&autospin=0.2" allow="autoplay; fullscreen" allowfullscreen></iframe>
+      </div>
+      <div class="card-content">
+        <span class="module-badge badge-control">WBC 转矩控制</span>
+        <h3>电流→转矩链路 &amp; 误差放大</h3>
+        <p>WBC (Whole-Body Control) 依赖精确转矩输出。电流到实际输出转矩经过 K<sub>t</sub> 标定、减速比放大、摩擦补偿。高减速比 (i≥80) 会放大所有误差源 30–50%。</p>
+        <div class="key-formula">T<sub>out</sub> = K<sub>t</sub>(T) · i<sub>q</sub> · i · η − T<sub>friction</sub> − T<sub>ripple</sub> + noise</div>
+        <div class="stats-row">
+          <span class="stat-item"><strong>i≤25</strong> 5–10% 误差</span>
+          <span class="stat-item"><strong>i≥80</strong> 30–50% 误差</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 模块 7: 力觉与编码器 -->
+    <div class="module-card">
+      <div class="model-viewer">
+        <iframe src="https://sketchfab.com/models/66b2ea9eb6e5468d91d814395036a537/embed?autostart=1&internal=1&tracking=0&ui_ar=0&ui_infos=0&ui_snapshots=0&ui_stop=0&ui_theatre=0&ui_watermark=0&ui_hint=2&autospin=0.2" allow="autoplay; fullscreen" allowfullscreen></iframe>
+      </div>
+      <div class="card-content">
+        <span class="module-badge badge-sensor">力觉 &amp; 感知</span>
+        <h3>力矩传感器 · 编码器 · 关节力观测</h3>
+        <p>关节力矩通过弹性体变形 (Δθ) 测量：T<sub>joint</sub> = K<sub>stiffness</sub> × Δθ。编码器提供位置反馈（10–40 kHz），力传感器直接测量外力。DOB 观测器估算干扰转矩。</p>
+        <div class="stats-row">
+          <span class="stat-item"><strong>编码器</strong> 10–40 kHz</span>
+          <span class="stat-item"><strong>力传感器</strong> 5–10% 精度</span>
+          <span class="stat-item"><strong>DOB</strong> 15–30% 补偿</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 模块 8: 机器人系统集成 -->
+    <div class="module-card">
+      <div class="model-viewer">
+        <iframe src="https://sketchfab.com/models/7159f69f4df2467ea9d22a3051740181/embed?autostart=1&internal=1&tracking=0&ui_ar=0&ui_infos=0&ui_snapshots=0&ui_stop=0&ui_theatre=0&ui_watermark=0&ui_hint=2&autospin=0.2" allow="autoplay; fullscreen" allowfullscreen></iframe>
+      </div>
+      <div class="card-content">
+        <span class="module-badge badge-system">系统集成</span>
+        <h3>H1 · Optimus · Walker 机器人架构</h3>
+        <p>从电机选型 → 传动方案 → 控制策略 → 力控实现的完整系统设计。对比不同减速比方案在精度、刚度、力控品质上的取舍。</p>
+        <div class="stats-row">
+          <span class="stat-item"><strong>H1</strong> QDD (i≈10)</span>
+          <span class="stat-item"><strong>Optimus</strong> 高减速 (i≈100)</span>
+          <span class="stat-item"><strong>Walker</strong> 谐波 (i≈50–160)</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="flow-section">
+  <h2 class="flow-title">⚡ 电流 → 运动的完整链路</h2>
+  <div class="flow-container">
+    <div class="flow-node"><div class="icon">⚡</div><div class="label">电流 i<sub>q</sub></div><div class="sub">FOC 矢量控制</div></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node"><div class="icon">🔄</div><div class="label">电磁转矩</div><div class="sub">T<sub>e</sub> = K<sub>t</sub>·i<sub>q</sub></div></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node"><div class="icon">⚙️</div><div class="label">减速放大</div><div class="sub">T<sub>out</sub> × i × η</div></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node"><div class="icon">📐</div><div class="label">弹性变形</div><div class="sub">T = K · Δθ</div></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node"><div class="icon">🤖</div><div class="label">关节运动</div><div class="sub">位置/力控输出</div></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node"><div class="icon">🎯</div><div class="label">WBC 控制</div><div class="sub">全身力控</div></div>
+  </div>
+</div>
+
+<div class="case-section">
+  <h2 class="section-title">系统方案对比</h2>
+  <p class="section-subtitle">不同机器人平台的传动与力控架构选择</p>
+  <div class="case-grid">
+    <div class="case-card">
+      <h4>🤖 H1 — 准直驱方案</h4>
+      <div class="spec"><strong>减速比</strong> 6–15:1 (QDD)</div>
+      <div class="spec"><strong>电机</strong> SPMSM + 低减速行星</div>
+      <div class="spec"><strong>力控</strong> T<sub>current</sub> + T<sub>dual</sub> 融合</div>
+      <div class="spec"><strong>精度</strong> 5–10%</div>
+      <div class="spec"><strong>特点</strong> 反向驱动性好，力控带宽高</div>
+    </div>
+    <div class="case-card">
+      <h4>🦾 Optimus — 高减速方案</h4>
+      <div class="spec"><strong>减速比</strong> ≈100:1 (行星 + 谐波)</div>
+      <div class="spec"><strong>电机</strong> SPMSM + 多级传动</div>
+      <div class="spec"><strong>力控</strong> 电流环 + 关节力矩传感器</div>
+      <div class="spec"><strong>精度</strong> &lt; 1%</div>
+      <div class="spec"><strong>特点</strong> 高刚度、高精度，力传感器要求高</div>
+    </div>
+    <div class="case-card">
+      <h4>🚶 Walker — 谐波减速方案</h4>
+      <div class="spec"><strong>减速比</strong> 50–160:1 (谐波)</div>
+      <div class="spec"><strong>电机</strong> SPMSM + 谐波减速器</div>
+      <div class="spec"><strong>力控</strong> 关节力矩传感器 + 电流混合</div>
+      <div class="spec"><strong>精度</strong> &lt; 1%</div>
+      <div class="spec"><strong>特点</strong> 零背隙，适用于高精度双足行走</div>
+    </div>
+  </div>
+</div>
+
+<div class="footer">
+  <p>基于《电机与传动系统底层原理》 · 3D 模型来源于 Sketchfab (CC 许可)</p>
+  <p>同步电机 · BLDC · 谐波减速器 · 步进电机 · 直流电机 · 通用电机模型</p>
+</div>
+
+</body>
+</html>

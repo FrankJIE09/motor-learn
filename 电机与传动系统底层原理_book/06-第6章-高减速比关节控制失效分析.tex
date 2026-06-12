@@ -1,0 +1,219 @@
+\chapter{高减速比关节控制失效分析}
+\label{ch:high_ratio_failure}
+
+\section{问题复盘：i=121关节的控制困境}
+
+\textbf{你遇到的问题}：躯干关节使用$i=121$的谐波减速器，试图使用电流力矩观测做力控，结果：
+\begin{itemize}
+  \item 力矩输出严重不准（实测与期望偏差30\%+）
+  \item 力控响应迟钝（相位滞后显著）
+  \item 低力矩指令下关节表现"黏滞"（摩擦力主导）
+  \item 被迫改为位置控制
+\end{itemize}
+
+\begin{keyinsight}{这不是算法问题，是硬件物理限制}
+记住：如果硬件方案决定了力矩控制不可能，\\
+\textbf{世界上最好的力控算法也无法挽救}。\\
+这不是你控制能力的问题，是\textbf{关节硬件方案选型}的问题。
+\end{keyinsight}
+
+\section{失效原因的系统性分析}
+
+\subsection{原因1：误差放大——数学上不可逆}
+
+\begin{equation}
+T_{\text{out, actual}} = K_t(T) \cdot i_q \cdot i \cdot \eta(\omega, T) - T_{\text{friction}}(\omega, T) - T_{\text{ripple}}(\theta) + \text{noise}
+\end{equation}
+
+对于$i=121$：
+\begin{itemize}
+  \item 电机端$K_t$的6\%温度漂移 $\rightarrow$ 关节端输出漂移约6\%
+  \item 电机端0.005 Nm的电流噪声 $\rightarrow$ 关节端0.605 Nm
+  \item 电机端0.01 Nm的齿槽转矩 $\rightarrow$ 关节端1.21 Nm
+  \item 总误差：\textbf{你可能完全不知道关节实际在出多大力}
+\end{itemize}
+
+\subsection{原因2：摩擦力矩占主导地位}
+
+高减速比关节的摩擦力矩是\textbf{实际可控力矩的主要成分}：
+
+\begin{equation}
+T_{\text{friction}} \approx 10\text{--}20\% T_{\text{rated}}
+\end{equation}
+
+摩擦模型的问题：
+\begin{itemize}
+  \item \textbf{Stribeck效应}：低速时摩擦随速度增加而\textbf{减小}，形成负阻尼
+  \item \textbf{静摩擦突发}：从静止到运动，摩擦力矩瞬间下降
+  \item \textbf{温度依赖性}：冷机摩擦是热机的2--3倍
+  \item \textbf{方向依赖}：正反转摩擦力矩不对称
+\end{itemize}
+
+\begin{cautionbox}{摩擦力矩主导导致的控制悖论}
+你要做力控 $\rightarrow$ 需要知道实际力矩 $\rightarrow$ 靠电流估算 $\rightarrow$ \\摩擦力不知道 $\rightarrow$ 力矩估算不准 $\rightarrow$ 力控效果差 $\rightarrow$ \\你用更大的力去补偿 $\rightarrow$ 更大的摩擦力 $\rightarrow$ 更差的效果\\
+这是一个\textbf{正反馈恶性循环}。
+\end{cautionbox}
+
+\subsection{原因3：扭转形变引入相位滞后}
+
+谐波减速器的柔轮扭转：
+\begin{itemize}
+  \item 在大力矩下扭转角可达1--3度（输出端）
+  \item 这引入了\textbf{数十毫秒的相位滞后}（取决于力矩变化率）
+  \item 在快速力控（WBC切换频率500--1000 Hz）下，滞后不可接受
+\end{itemize}
+
+\begin{equation}
+\phi_{\text{lag}} = \arctan(\omega_{\text{ctrl}} / \omega_{\text{resonance}})
+\end{equation}
+
+其中$\omega_{\text{resonance}}$是关节的扭转谐振频率，高减速比关节的谐振频率通常低于50 Hz。
+
+\subsection{原因4：输出惯量反射——对外力不敏感}
+
+折算到电机侧的负载惯量：
+\begin{equation}
+J_{\text{reflected}} = \frac{J_{\text{load}}}{i^2}
+\end{equation}
+
+当$i=121$时，$J_{\text{reflected}} \approx J_{\text{load}} / 14641$。
+
+\begin{itemize}
+  \item 外部施加给关节的力，在电机端几乎\textbf{完全感受不到}
+  \item 这意味着：\textbf{高减速比关节对人是刚性锁死的}
+  \item 这就是为什么高减速比关节\textbf{天生不适合做柔顺力控/人机交互}
+\end{itemize}
+
+\begin{engineeringbox}{高减速比关节的唯一适用场景}
+高减速比关节\textbf{唯一擅长}的任务是：\\
+\textbf{刚性位置控制}——定位精度高、刚度大、抗扰动。\\
+它适合做：躯干支撑、基座定位、重载搬运。\\
+\textbf{它不适合做}：柔顺力控、碰撞检测、人机交互、精细操作。
+\end{engineeringbox}
+
+\section{高减速比关节力控的"伪破解"方案分析}
+
+有些方法声称可以"绕过"高减速比的力控限制，我们来逐个分析：
+
+\subsection{方案1：加摩擦力矩前馈补偿}
+
+\textbf{效果}：部分有效，但有限。\\
+\textbf{局限}：摩擦模型在低速和换向时误差大，温度变化后需要重新标定。\\
+\textbf{结论}：能改善10--20\%，但无法突破根本限制。
+
+\subsection{方案2：加输出端力矩传感器}
+
+\begin{equation}
+T_{\text{measured}} = T_{\text{actual}} \pm \epsilon_{\text{sensor}}
+\end{equation}
+
+\textbf{效果}：这是\textbf{唯一真正的解决方案}。\\
+\textbf{原因}：力矩传感器直接测量关节输出力矩，绕过了电流观测的所有误差累积。\\
+\textbf{代价}：成本增加、结构复杂度增加、需要额外的信号处理通道。
+
+\subsection{方案3：DOB/ADRC等高级扰动观测}
+
+\textbf{效果}：在摩擦补偿基础上进一步改善，但仍受限。\\
+\textbf{局限}：观测器性能取决于模型精度，而高减速比下模型精度天然差。\\
+\textbf{结论}：IO（输入-输出）层面的改进无法消除物理限制。
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lccc}
+\toprule
+\textbf{方案} & \textbf{效果} & \textbf{代价} & \textbf{推荐} \\
+\midrule
+摩擦补偿 & 改善10--20\% & 标定工作量大 & 过渡方案 \\
+\textbf{输出端力矩传感器} & \textbf{彻底解决} & 成本+结构复杂度 & \textbf{唯一方案} \\
+DOB/ADRC & 改善15--30\% & 算法复杂，鲁棒性差 & 辅助方案 \\
+换低减速比电机 & 彻底解决 & 重新设计关节 & 下一代方案 \\
+\bottomrule
+\end{tabular}
+\caption{高减速比关节力控方案对比}
+\label{tab:fix_solutions}
+\end{table}
+
+\section{为什么只能改用位置控制}
+
+从力控切到位置控制，本质上是\textbf{选择了适合高减速比关节的控制范式}：
+
+\subsection{位置控制与高减速比关节的匹配性}
+
+\begin{itemize}
+  \item 位置控制不需要精确的力矩信息
+  \item 高减速比关节的位置分辨率\textbf{天然高}（因为电机端编码器经过减速比放大）
+  \item 大刚度特性有利于位置保持和抗扰动
+  \item 摩擦和扭转形变在位置控制中被视为\textbf{可以被PD控制器克服的扰动}
+\end{itemize}
+
+\subsection{切换的代价}
+
+\begin{itemize}
+  \item \textbf{失去柔顺性}：不能做阻抗控制、力控
+  \item \textbf{安全性降低}：碰撞检测不灵敏，容易伤人/损坏自己
+  \item \textbf{WBC受限}：切换后关节只能做位置模式，减少了WBC的优化自由度
+\end{itemize}
+
+\begin{debugbox}{力控转位置控的实际操作建议}
+如果必须使用高减速比关节，且暂时无法加力矩传感器：\\
+1. 该关节\textbf{只做位置模式}，不做力控\\
+2. WBC中该关节的力控维度\textbf{改为位置约束}\\
+3. 关节力矩保护\textbf{用电流限幅替代}（虽然不准，但至少防止过载）\\
+4. 将力控需求\textbf{转移到低减速比关节}（如手臂、腿部末端）\\
+5. 在下一代硬件中\textbf{彻底替换这个关节}
+\end{debugbox}
+
+\section{下一代硬件优化的核心方向}
+
+如果你能影响硬件设计，以下是高减速比关节的改进方向：
+
+\begin{enumerate}
+  \item \textbf{最推荐：半直驱化}
+  \begin{itemize}
+    \item 将$i=121$替换为$i=10$左右的大扭矩电机
+    \item 代价是电机更大更重，但控制性能质的飞跃
+    \item 适合新关节设计
+  \end{itemize}
+  \item \textbf{次推荐：加输出端力矩传感器}
+  \begin{itemize}
+    \item 保留现有减速器，在输出端串联力矩传感器
+    \item 适合现有关节改造
+    \item 代价是重量和成本
+  \end{itemize}
+  \item \textbf{加双编码器（如果只有单编码器）}
+  \begin{itemize}
+    \item 至少提供基本的力矩估计能力
+    \item 明显不如方案2，但聊胜于无
+  \end{itemize}
+\end{enumerate}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{p{3cm}p{3.5cm}p{3.5cm}p{3.5cm}}
+\toprule
+\textbf{改进方向} & \textbf{成本增量} & \textbf{力控提升} & \textbf{适用阶段} \\
+\midrule
+半直驱化 & 高（新电机+新结构） & 质的飞跃 & 新关节设计 \\
+加力矩传感器 & 中（$<$5000元/关节） & 彻底解决 & 现有关节改造 \\
+加双编码器 & 低 & 中等 & 最低成本方案 \\
+\bottomrule
+\end{tabular}
+\caption{高减速比关节改进方案}
+\label{tab:improvement}
+\end{table}
+
+\section*{本章小结}
+\addcontentsline{toc}{section}{本章小结}
+
+\begin{summarybox}{}
+\begin{enumerate}
+  \item \textbf{$i=121$关节做电流力矩观测是物理不可能}——误差放大121倍
+  \item 摩擦力矩占主导地位（>10\%额定力矩），且高度非线性不可精确建模
+  \item 扭转柔性和惯量反射导致\textbf{对外力完全不敏感}
+  \item 高减速比关节\textbf{只适合刚性位置控制}，不适合柔顺力控
+  \item 从力控切换到位置控制是\textbf{合理的选择}，不是失败
+  \item 唯一的根治方案：\textbf{加输出端力矩传感器}或\textbf{换为低减速比关节}
+\end{enumerate}
+\end{summarybox}
+
+\newpage

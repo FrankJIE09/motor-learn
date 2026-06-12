@@ -1,0 +1,32 @@
+# LaTeX 构建中间产物
+*.log
+*.aux
+*.out
+*.toc
+*.lof
+*.lot
+*.bbl
+*.blg
+*.idx
+*.ind
+*.ilg
+*.synctex.gz
+
+# 生成的 PDF（原始的源 PDF 也忽略，太大）
+*.pdf
+
+# build 输出目录
+**/build/
+
+# 操作系统文件
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# IDE/编辑器
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace

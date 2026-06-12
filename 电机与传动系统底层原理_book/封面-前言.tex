@@ -1,0 +1,93 @@
+% 封面
+\begin{titlepage}
+\centering
+\vspace*{3cm}
+{\Huge\bfseries\color{primaryblue} 机器人运动控制必备：\\[15pt]
+电机与传动系统底层原理}\\[20pt]
+{\Large 面向机器人WBC、全身动力学、关节力控、真机落地工程师}\\[10pt]
+{\large 工程实战教材}\\[30pt]
+
+\rule{0.8\textwidth}{1pt}\\[20pt]
+
+{\large\bfseries 本书定位}\\[10pt]
+\begin{minipage}{0.85\textwidth}
+\centering
+不是电机设计手册，而是\textbf{运动控制工程师的硬件认知地图}。\\
+教你判断：什么硬件能控、什么硬件永远控不了、\\
+什么误差来自电机、什么误差来自减速器、\\
+什么场景能用电流力控、什么场景必须力矩传感器。
+\end{minipage}\\[30pt]
+
+\vfill
+{\large \today}
+\end{titlepage}
+
+% 目录
+\tableofcontents
+\newpage
+
+% 前言
+\chapter*{前言}
+\addcontentsline{toc}{chapter}{前言}
+
+\section*{为什么你需要这本手册}
+
+如果你正在做机器人全身控制（WBC）、力控、动力学辨识或真机部署，你一定会遇到以下问题：
+
+\begin{itemize}
+  \item 为什么我用电流算力矩，某些关节准、某些关节完全不靠谱？
+  \item 为什么我的半直驱关节可以做柔顺力控，躯干高减速比关节一做力控就震荡？
+  \item 双编码器到底有什么用？只是为了提高定位精度吗？
+  \item 为什么不同的机器人（宇树H1、特斯拉Optimus、优必选Walker）关节方案完全不同？
+  \item 我该给硬件团队提什么样的关节需求，才能让控制算法有效？
+\end{itemize}
+
+如果你被这些问题困扰过，这本书就是为你写的。
+
+\section*{这本书不教什么}
+
+\begin{itemize}
+  \item \textbf{不教} 电机电磁设计（绕组计算、磁路优化、槽满率）
+  \item \textbf{不教} 减速器齿轮强度/寿命/润滑设计
+  \item \textbf{不教} 编码器光电/磁编码器制造工艺
+\end{itemize}
+
+这些是\textbf{电机工程师}该关心的，不是\textbf{控制工程师}该关心的。
+
+\section*{这本书教什么}
+
+\begin{enumerate}
+  \item 电机\textbf{哪些结构参数}影响你的控制算法（惯量、扭矩密度、转矩脉动）
+  \item 减速器\textbf{如何放大误差}，以及在什么减速比下电流力矩观测\textbf{彻底失效}
+  \item 双编码器\textbf{辅助力矩观测}的完整原理
+  \item 为什么高减速比关节\textbf{天生不适合}柔顺力控
+  \item 主流人形/四足机器人关节方案\textbf{架构差异}
+  \item 如何判断一个关节\textbf{能不能做力控}、能不能用电流观测
+\end{enumerate}
+
+\section*{谁应该读这本书}
+
+\begin{itemize}
+  \item 做机器人\textbf{WBC}的算法工程师——理解硬件为什么限制你的算法上限
+  \item 做\textbf{关节力控}的工程师——弄懂电流观测的边界条件
+  \item 做\textbf{动力学辨识}的工程师——辨识误差的来源到底是电机还是减速器
+  \item 做\textbf{真机落地}的工程师——判断项目硬件方案的可控性
+  \item 给硬件团队\textbf{提需求}的负责人——学会提\textbf{有效技术需求}
+\end{itemize}
+
+\section*{关于本书的阅读建议}
+
+\begin{itemize}
+  \item \textbf{初学者}：按顺序阅读第1--6章，建立完整认知体系
+  \item \textbf{有经验者}：可直接从第3章（减速比核心理论）和第6章（高减速比失效分析）读起
+  \item \textbf{选型评估}：重点读第7--8章
+\end{itemize}
+
+每一章节末尾都有\textbf{本章小结}，总结了该章最核心的工程结论。
+
+\begin{flushright}
+作者\\
+\today
+\end{flushright}
+
+\newpage

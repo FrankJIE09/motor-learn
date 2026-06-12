@@ -1,0 +1,225 @@
+\chapter{运动控制工程师的硬件选型标准}
+\label{ch:selection}
+
+\section{做WBC、力控、RL真机需要什么样的关节}
+
+\textbf{这是全书最实战的一章}。当你要为下一代机器人选择关节硬件，或者评估现有硬件能否满足控制需求时，下面这些标准就是你的\textbf{判断框架}。
+
+\subsection{力控关节的黄金标准}
+
+\begin{keyinsight}{力控关节黄金标准}
+\begin{itemize}
+  \item 减速比 $\leq 25$（最好 $\leq 10$）
+  \item 半直驱结构（大扭矩电机+低减速比行星减速器）
+  \item 双编码器（电机端+输出端）
+  \item 扭矩密度 $\geq 2$ Nm/kg
+  \item 转矩脉动 $< 1\%$ 额定力矩
+\end{itemize}
+满足上述全部条件的关节→可做无力矩传感器的高性能力控。
+\end{keyinsight}
+
+\section{如何判断一个关节能不能做力控}
+
+\textbf{三步判断法}：
+
+\subsection{第一步：看减速比}
+
+\begin{itemize}
+  \item $i \leq 25$：\textcolor{successgreen}{可行}，电流力控可用
+  \item $25 < i < 80$：\textcolor{infoyellow}{谨慎}，需要力矩传感器
+  \item $i \geq 80$：\textcolor{warnred}{不可行}，必须输出端力矩传感器
+\end{itemize}
+
+\subsection{第二步：看力矩传感器}
+
+\begin{itemize}
+  \item \textbf{有输出端力矩传感器}：无论减速比大小，都可以做力控（但高减速比下力控带宽受限）
+  \item \textbf{无力矩传感器}：
+  \begin{itemize}
+    \item $i \leq 25$：可以做电流力控
+    \item $i > 25$：\textbf{基本不能做精确力控}
+  \end{itemize}
+\end{itemize}
+
+\subsection{第三步：看双编码器}
+
+\begin{itemize}
+  \item \textbf{有双编码器} + $i \leq 25$：最优组合，电流力控+双编码器校核
+  \item \textbf{有双编码器} + $i > 25$：可以提供低精度力矩估计，辅助控制
+  \item \textbf{只有单编码器}：只能靠电流力控，受所有误差影响
+\end{itemize}
+
+\begin{figure}[H]
+\centering
+\begin{tcolorbox}[colback=lightgray]
+\centering
+\textbf{关节力控可行性判断决策树}\\
+\vspace{5pt}
+\begin{tabular}{l}
+1. $i \leq 25$? → Yes → 电流力控可用 \\
+\hspace{3em} → 有双编码器？→ Yes → 最优方案 \\
+\hspace{3em} → 无双编码器？→ 电流力控基本够用 \\
+2. $i > 25$? \\
+\hspace{3em} → 有力矩传感器？→ Yes → 力控可行（带宽受限）\\
+\hspace{3em} → 无力矩传感器？→ \textbf{力控不可行} \\
+\end{tabular}
+\end{tcolorbox}
+\caption{关节力控可行性判断流程}
+\label{fig:decision_tree}
+\end{figure}
+
+\section{如何判断能不能用电流观测}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{cp{3.5cm}p{3.5cm}p{3.5cm}}
+\toprule
+\textbf{判断条件} & \textbf{可用} & \textbf{勉强可用} & \textbf{不可用} \\
+\midrule
+减速比 & $\leq 25$ & 25--80 & $\geq 80$ \\
+效率 & $\geq 90\%$ & 85--90\% & $< 85\%$ \\
+转矩脉动 & $< 1\%$ & 1--3\% & $> 3\%$ \\
+摩擦占比 & $< 5\%$ & 5--10\% & $> 10\%$ \\
+温度补偿 & 有 & 有限 & 无 \\
+\bottomrule
+\end{tabular}
+\caption{电流力矩观测可行性判断标准}
+\label{tab:current_feasibility}
+\end{table}
+
+\section{如何给硬件团队提交有效技术需求}
+
+多数控制工程师给硬件团队提需求时，会说：
+\begin{itemize}
+  \item "我要一个能做力控的关节"
+  \item "力矩要够大"
+  \item "响应要快"
+\end{itemize}
+
+\textbf{这是一个无效需求}。
+
+\subsection{有效需求模板}
+
+\textbf{场景一：需要高性能力控关节}
+
+\begin{tcolorbox}[colback=lightgray]
+\textbf{需求描述}：下肢/手臂力控关节\\
+\textbf{控制目标}：做阻抗控制、碰撞检测、WBC力控维度\\
+\textbf{核心参数要求}：
+\begin{itemize}
+  \item 减速比 $\leq 10$（半直驱）
+  \item 输出端编码器分辨率 $\geq 2^{19}$ 脉冲/转
+  \item 电机端编码器更新率 $\geq 10$ kHz
+  \item 转矩脉动 $< 1\%$ 额定力矩
+  \item 连续输出力矩：满足动态最大需求
+  \item 峰值力矩（3秒）：连续力矩的2--3倍
+\end{itemize}
+\textbf{可选}：如果需要更高的力控精度（$< 1\%$），增加输出端力矩传感器
+\end{tcolorbox}
+
+\textbf{场景二：需要刚性定位关节}
+
+\begin{tcolorbox}[colback=lightgray]
+\textbf{需求描述}：躯干/基座定位关节\\
+\textbf{控制目标}：位置控制、刚性支撑\\
+\textbf{核心参数要求}：
+\begin{itemize}
+  \item 减速比 $\geq 80$（谐波或行星多级）
+  \item 位置重复定位精度 $\leq 0.01^\circ$
+  \item 扭转刚度 $\geq 10^4$ Nm/rad
+  \item 断电自锁能力
+  \item 力矩保护：电流限幅（不需要精确力控）
+\end{itemize}
+\textbf{注意}：此关节\textbf{不适合}做柔顺力控
+\end{tcolorbox}
+
+\subsection{控制工程师向硬件团队传达的信息要点}
+
+\begin{enumerate}
+  \item \textbf{明确控制目标}：要做力控还是位置控制？
+  \item \textbf{给出关键参数}：减速比、编码器规格、转矩脉动上限
+  \item \textbf{说明取舍}：力控性能 vs 力矩密度 vs 成本，你的优先级是什么
+  \item \textbf{说明不可行的方案}：比如"$i > 25$且无力矩传感器的关节无法做力控"
+  \item \textbf{提供验证标准}："\textbf{能不能用}的判断标准是……"
+\end{enumerate}
+
+\section{关节硬件选型速查表}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{p{3.5cm}p{4cm}p{4cm}}
+\toprule
+\textbf{应用场景} & \textbf{推荐关节配置} & \textbf{理由} \\
+\midrule
+下肢行走（动态） & 半直驱 $i=8$--15，双编码器 & 需要高力控带宽和碰撞检测灵敏 \\
+下肢站立（静态） & 高减速比 $i>80$ + 力矩传感器 & 需要高力矩密度和精度 \\
+上肢操作 & 半直驱或中减速比+力矩传感器 & 需要力控精确但带宽可略低 \\
+灵巧手 & 空心杯电机+微型行星 & 极低转矩脉动和零齿槽效应 \\
+躯干/腰 & 高减速比谐波+力矩传感器 & 力矩大、定位精度高、可力控 \\
+头部/颈部 & 小型半直驱 & 柔顺性优先 \\
+\bottomrule
+\end{tabular}
+\caption{不同应用场景的推荐关节配置}
+\label{tab:application_config}
+\end{table}
+
+\section{运动控制工程师的最终建议}
+
+\begin{keyinsight}{给你最核心的三条建议}
+\begin{enumerate}
+  \item \textbf{永远先看减速比}——它决定了力控的物理可行性上限
+  \item \textbf{力矩传感器不是万能的}——但它是高减速比关节做力控的\textbf{唯一选项}
+  \item \textbf{学会给硬件团队提有效需求}——"能做力控"不是需求，具体参数才是
+\end{enumerate}
+\end{keyinsight}
+
+\subsection{你的核心竞争力}
+
+你是一个做\textbf{控制落地}的工程师。你的核心竞争力不是解复杂的数学方程，而是：
+\begin{itemize}
+  \item \textbf{判断什么硬件能控、什么控不了}
+  \item \textbf{判断控制问题来自算法还是硬件}
+  \item \textbf{判断什么样的控制策略适合什么样的硬件}
+  \item \textbf{给硬件团队提供有效、可执行的技术输入}
+\end{itemize}
+
+这本书全部的内容，都是为了帮你建立这个判断力。
+
+\section*{本书结语}
+\addcontentsline{toc}{section}{本书结语}
+
+从第1章到第8章，我们走完了从\textbf{电机基本认知}到\textbf{硬件选型判断}的完整闭环。
+
+回顾全书的核心脉络：
+
+\begin{enumerate}
+  \item \textbf{电机本体}（第1--2章）：理解电机哪些参数影响控制
+  \item \textbf{传动系统}（第3章）：理解减速比如何放大误差
+  \item \textbf{力矩观测}（第4--5章）：理解电流和编码器如何估计力矩
+  \item \textbf{失效分析}（第6章）：理解高减速比关节为什么控不了
+  \item \textbf{方案对比}（第7章）：理解主流硬件的设计逻辑
+  \item \textbf{选型标准}（第8章）：如何做出正确的硬件决策
+\end{enumerate}
+
+\begin{engineeringbox}{最后的话}
+控制工程师和硬件工程师之间最大的鸿沟是：\\
+\textbf{控制工程师不知道硬件有什么限制}\\
+\textbf{硬件工程师不知道控制需要什么参数}\\
+\\
+你能跨越这个鸿沟，就是你的不可替代性。
+\end{engineeringbox}
+
+\section*{本章小结}
+\addcontentsline{toc}{section}{本章小结}
+
+\begin{summarybox}{}
+\begin{enumerate}
+  \item 力控关节黄金标准：$i \leq 25$、半直驱、双编码器、低脉动
+  \item 判断力控可行性：三步法（看减速比、看力矩传感器、看编码器）
+  \item 给硬件提需求：\textbf{要具体参数，不要模糊描述}
+  \item 不同应用场景需要不同的关节配置，没有"万能关节"
+  \item 跨越控制与硬件的鸿沟，是你最核心的竞争力
+\end{enumerate}
+\end{summarybox}
+
+\newpage

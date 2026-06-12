@@ -1,0 +1,234 @@
+\documentclass[12pt,a4paper,landscape]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{ctex}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{geometry}
+\usepackage{xcolor}
+\usepackage{hyperref}
+
+\geometry{a4paper, margin=1.5cm}
+
+% 自定义列宽
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+\newcolumntype{C}[1]{>{\centering\arraybackslash}p{#1}}
+
+\title{同川科技TCHR低压伺服模组——EtherCAT对象字典地址表}
+\author{}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\section*{控制与状态}
+
+\begin{longtable}{|C{1.8cm}|L{3.5cm}|C{1.2cm}|C{1cm}|L{6cm}|L{3cm}|}
+\hline
+\rowcolor{gray!20}
+\textbf{对象地址} & \textbf{名称} & \textbf{数据类型} & \textbf{属性} & \textbf{功能说明} & \textbf{单位/备注} \\
+\hline
+\endhead
+\hline
+\endfoot
+0x6040 & Controlword & UINT16 & RW & 控制字：控制伺服使能、急停、故障复位、开关主电源等操作 & Bit 0：切换ON/OFF \\
+\hline
+0x6041 & Statusword & UINT16 & RO & 状态字：读取驱动器当前运行状态（准备就绪、使能、故障等） & — \\
+\hline
+0x6060 & Modes of operation & INT8 & RW & 设置控制模式：0x01 PP位置、0x03 PV速度、0x04 PT扭矩、0x06 Homing、0x08 CSP、0x09 CSV、0x0A CST & — \\
+\hline
+0x6061 & Modes of operation display & INT8 & RO & 读取当前实际运行的控制模式 & — \\
+\hline
+0x603F & Error Code & UINT16 & RO & 读取当前故障码 & — \\
+\hline
+0x605A & Quick Stop Option Code & INT16 & RW & 快速停止时的停车方式选择（0=减速停车，1=自由停车等） & — \\
+\hline
+0x605E & Fault reaction option code & INT16 & RW & 故障时的反应方式（0=减速停车，1=自由停车，2=急停等） & — \\
+\hline
+0x607E & Polarity & UINT8 & RW & 电机方向取反设置 & Bit 0：位置取反 \\
+\hline
+\multicolumn{6}{|c|}{\textbf{位置类}} \\
+\hline
+0x607A & Target position & INT32 & RW & 写入目标位置，驱动器根据设置的速度/加速度运动到该位置 & puu（用户单位） \\
+\hline
+0x6064 & Position actual value & INT32 & RO & \textbf{读取当前实际位置}（电机端或输出端，取决于反馈模式设置） & puu \\
+\hline
+0x6063 & Position actual value(increment) & INT32 & RO & 读取编码器脉冲形式的位置值 & ppr \\
+\hline
+0x6062 & Position demand value & INT32 & RO & 读取位置环的指令位置（经过轨迹规划后的值） & puu \\
+\hline
+0x60FC & Position demand value & INT32 & RO & 位置指令值（与6062同义） & puu \\
+\hline
+0x607C & Home Offset & INT32 & RW & 原点偏移量，设置当前位置相对于机械原点的偏移 & puu \\
+\hline
+0x607D & Software position limit & INT32[] & RW & 软件限位：Sub-1 正限位，Sub-2 负限位，超出则零速停车 & puu \\
+\hline
+0x60F4 & Following error actual value & INT32 & RO & 读取当前位置跟随误差（指令位置～实际位置之差） & puu \\
+\hline
+0x6065 & Following error window & UINT32 & RW & 跟随误差警告窗口值，超出此值触发报警 & puu \\
+\hline
+0x6066 & Following error Timeout & UINT32 & RW & 跟随误差超时时间 & ms \\
+\hline
+0x60B0 & Position offset & INT32 & RW & 位置偏移量（前馈用） & puu \\
+\hline
+\multicolumn{6}{|c|}{\textbf{速度类}} \\
+\hline
+0x60FF & Target velocity & INT32 & RW & 写入目标速度（速度/CSV模式下使用） & puu/s \\
+\hline
+0x606C & Velocity actual value & INT32 & RO & \textbf{读取当前实际速度} & puu/s \\
+\hline
+0x606B & Velocity demand value & INT32 & RO & 读取速度环的指令速度（经过加减速规划后） & puu/s \\
+\hline
+0x607F & Max profile velocity & UINT32 & RW & 最大轮廓速度限制 & puu/s \\
+\hline
+0x6080 & Max Motor Speed & UINT32 & RW & 电机最高转速限制 & rpm \\
+\hline
+0x6081 & Profile velocity & UINT32 & RW & 轮廓位置模式（PP）下的目标运行速度 & puu/s \\
+\hline
+0x6083 & Profile acceleration & UINT32 & RW & 加速度设置 & puu/s² \\
+\hline
+0x6084 & Profile deceleration & UINT32 & RW & 减速度设置 & puu/s² \\
+\hline
+0x6085 & Quick stop deceleration & UINT32 & RW & 快速停止减速度 & puu/s² \\
+\hline
+0x60C5 & Max acceleration & UINT32 & RW & 最大加速度限制 & puu/s² \\
+\hline
+0x60C6 & Max deceleration & UINT32 & RW & 最大减速度限制 & puu/s² \\
+\hline
+0x60B1 & Velocity offset & INT32 & RW & 速度偏移量（速度前馈用） & puu/s \\
+\hline
+0x606D & Velocity window & UINT16 & RW & 速度到达检测窗口 & rpm \\
+\hline
+0x606E & Velocity window time & UINT16 & RW & 速度到达判定时间 & ms \\
+\hline
+0x606F & Velocity threshold & UINT16 & RW & 零速度阈值 & rpm \\
+\hline
+\multicolumn{6}{|c|}{\textbf{力矩/电流类}} \\
+\hline
+0x6071 & Target torque & INT16 & RW & 写入目标扭矩（PT/CST模式下使用） & 0.1\% 额定扭矩 \\
+\hline
+0x6077 & Torque actual value & UINT16 & RO & \textbf{读取当前实际扭矩}（百分比形式） & 0.1\% 额定扭矩 \\
+\hline
+0x6074 & Torque demand value & INT16 & RO & 读取扭矩环的指令扭矩 & 0.1\% 额定扭矩 \\
+\hline
+0x6072 & Max torque & UINT16 & RW & 最大扭矩限制 & 0.1\% 额定扭矩 \\
+\hline
+0x6075 & Motor rated current & UINT32 & RO & 读取电机额定电流 & 0.1A \\
+\hline
+0x6076 & Motor rated torque & UINT32 & RO & 读取电机额定扭矩 & 0.001Nm \\
+\hline
+0x60B2 & Torque offset & INT16 & RW & 扭矩偏移量（扭矩前馈用） & 0.1\% 额定扭矩 \\
+\hline
+0x6087 & Torque slope & UINT32 & RW & 扭矩变化斜率（PT模式下使用） & 0.1\%/s \\
+\hline
+0x60E0 & Positive Torque Limit Value & UINT16 & RW & 正方向扭矩限制 & 0.1\% 额定扭矩 \\
+\hline
+0x60E1 & Negative Torque Limit Value & UINT16 & RW & 负方向扭矩限制 & 0.1\% 额定扭矩 \\
+\hline
+\multicolumn{6}{|c|}{\textbf{厂商自定义（0x3000系列——按键参数）}} \\
+\hline
+0x3000 & 当前转速 & INT16 & RO & \textbf{读取电机当前转速} & rpm，范围 -10000～10000 \\
+\hline
+0x3001 & 电机负载率 & UINT16 & RO & \textbf{读取当前输出转矩与额定转矩之比}（\%） & \(-4000\sim4000\)（-400\%～400\%） \\
+\hline
+0x3002 & 当前电角度 & UINT16 & RO & 读取电机转子当前电角度 & 0～3599（0.1°） \\
+\hline
+0x3005 & 电机端多圈值 & UINT16 & RO & 读取电机端编码器的多圈计数值 & — \\
+\hline
+0x3008 & MCU温度 & INT16 & RO & 读取MCU内部传感器温度 & ℃，范围 -100～100 \\
+\hline
+0x3009 & 电机温度 & INT16 & RO & 读取电机内部温度（部分型号支持） & ℃ \\
+\hline
+0x300B & 母线电压 & UINT16 & RO & \textbf{读取直流母线电压} & V，范围 0～1000 \\
+\hline
+0x300C & 电流有效值 & INT16 & RO & \textbf{读取电机电流有效值} & A，范围 0～65535 \\
+\hline
+0x300F & IGBT模块温度 & UINT16 & RO & 读取IGBT内部温度 & ℃，范围 0～200 \\
+\hline
+0x3018 & 编码器单圈位置值 & UDINT & RO & 读取17位编码器当前单圈位置值（低4位） & ppr \\
+\hline
+0x301C & 反馈总脉冲 & DINT & RO & 读取伺服电机旋转总脉冲数（仅位置模式有效） & ppr \\
+\hline
+0x3028 & ECAT状态 & UINT16 & RO & 读取EtherCAT通信当前状态 & 0=Init, 1=PreOp, 2=SafeOp, 3=Op \\
+\hline
+0x3029 & 速度命令 & INT16 & RO & 读取当前速度指令值 & rpm \\
+\hline
+0x302A & 第二编码器位置计数 & UDINT & RO & 读取输出端编码器位置计数 & ppr \\
+\hline
+0x302C & 伺服错误码 & UINT16 & RO & 读取伺服驱动器当前故障码 & — \\
+\hline
+0x302D & ECAT报警码 & UINT16 & RO & 读取EtherCAT通信报警码 & — \\
+\hline
+0x302F & 电机额定电流 & UINT16 & RO & 读取存储的电机额定电流参数 & 0.1A \\
+\hline
+0x3032 & 输出端位置反馈 & DINT & RO & \textbf{读取减速机输出端的位置反馈}（全闭环时使用） & puu \\
+\hline
+0x3034 & 电机端位置反馈 & DINT & RO & \textbf{读取电机端的位置反馈} & puu \\
+\hline
+0x3037 & 输出端多圈值 & INT & RO & 读取输出端编码器多圈值 & — \\
+\hline
+0x303A & 扭矩传感器值 & DINT & RO & \textbf{读取扭矩传感器实际值}（配传感器时有效） & 0.01Nm \\
+\hline
+0x303C & 扭矩传感器值 & INT & RO & 读取扭矩传感器值 & 0.1\% \\
+\hline
+\multicolumn{6}{|c|}{\textbf{厂家参数设置（0x3100～0x3D00系列）}} \\
+\hline
+0x3104 & 电机方向取反 & UINT & RW & 电机旋转方向取反设置（Pr1.04） & 0=正转，1=反转 \\
+\hline
+0x3113 & 超程保护减速时间 & UINT & RW & 超出软限位时的减速停车时间 & ms \\
+\hline
+0x3127 & 最高转速设定 & UINT & RW & 最高转速限制（超速保护阈值） & rpm \\
+\hline
+0x312E & 正转最大转矩限制 & UINT & RW & 正方向最大输出转矩限制（Pr1.46） & 0.1\% \\
+\hline
+0x312F & 反转最大转矩限制 & UINT & RW & 反方向最大输出转矩限制（Pr1.47） & 0.1\% \\
+\hline
+0x3401 & 转矩控制时速度限幅 & UINT & RW & CST/PT模式下的速度上限值（Pr4.01） & rpm \\
+\hline
+0x3500 & 位置调节器比例增益KPP & UINT & RW & 位置环比例增益（Pr5.00） & — \\
+\hline
+0x3501 & 速度调节器比例增益 & UINT & RW & 速度环比例增益（Pr5.01） & — \\
+\hline
+0x3502 & 速度环积分时间常数 & UINT & RW & 速度环积分时间（Pr5.02） & ms \\
+\hline
+0x3504 & 速度前馈前馈增益 & UINT & RW & 速度前馈增益（Pr5.04） & — \\
+\hline
+0x3506 & 转矩前馈增益 & UINT & RW & 转矩前馈增益（Pr5.06） & — \\
+\hline
+0x350C & 速度反馈低通滤波时间 & UINT & RW & 速度反馈低通滤波器时间常数（Pr5.12） & ms \\
+\hline
+0x3809 & 软限位开关 & UINT & RW & 软限位功能使能开关（Pr8.09） & 0=关闭，1=开启 \\
+\hline
+0x380C & 驱动器过载警告值设置 & UINT & RW & 驱动器过载警告阈值（Pr8.12） & — \\
+\hline
+0x380D & 电机过载警告值设置 & UINT & RW & 电机过载警告阈值（Pr8.13） & — \\
+\hline
+0x381C & 位置反馈模式 & UINT & RW & 选择位置反馈源——电机端或输出端（Pr8.28） & 0=电机端，1=输出端 \\
+\hline
+0x381D & 软件过流开关 & UINT & RW & 软件过流保护使能（Pr8.29） & — \\
+\hline
+0x381E & 强制抱闸打开 & UINT & RW & 强制打开制动抱闸（Pr8.30） & — \\
+\hline
+0x3823 & 堵转电流阈值 & UINT & RW & 堵转保护电流阈值（Pr8.35） & A \\
+\hline
+0x3824 & 堵转保护时间 & UINT & RW & 堵转保护判定时间（Pr8.36） & s \\
+\hline
+0x3825 & 堵转保护开关 & UINT & RW & 堵转保护功能使能（Pr8.37） & 0=关闭，1=开启 \\
+\hline
+0x3D00 & 全闭环功能 & UINT & RW & 全闭环控制使能（PrD.00） & 0=半闭环，1=全闭环 \\
+\hline
+0x3D01 & 全闭环滤波等级 & UINT & RW & 全闭环滤波等级设置（PrD.01） & — \\
+\hline
+0x3D02 & 全闭环编码器类型 & UINT & RW & 选择全闭环使用的编码器类型（PrD.02） & — \\
+\hline
+0x3D04 & 全闭环编码器分辨率 & UINT & RW & 输出端编码器分辨率（PrD.04） & ppr \\
+\hline
+0x3D06 & 减速比 & UINT & RW & 设置减速机减速比（PrD.06） & — \\
+\hline
+0x6091 & Gear Ratio & UDINT[] & RW & 电子齿轮比设置 Sub-1=分子，Sub-2=分母 & — \\
+\hline
+0x6502 & Supported drive modes & UINT32 & RO & 读取驱动器支持的运行模式位掩码 & — \\
+\hline
+\end{longtable}
+
+\end{document}

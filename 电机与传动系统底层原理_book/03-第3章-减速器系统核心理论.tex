@@ -1,0 +1,262 @@
+\chapter{减速器系统核心理论}
+\label{ch:gearbox}
+
+\section{减速器的本质——力矩放大器与误差放大器}
+
+减速器在机器人关节中的核心作用只有一个：\textbf{将电机的高速小力矩转换为低速大力矩}。
+
+\begin{equation}
+T_{\text{out}} = T_{\text{motor}} \times i \times \eta
+\qquad
+\omega_{\text{out}} = \frac{\omega_{\text{motor}}}{i}
+\end{equation}
+
+其中$i$是减速比，$\eta$是传动效率（$0 < \eta < 1$）。
+
+\begin{keyinsight}{减速器也是误差放大器}
+这是本书最重要的认知之一：\\
+减速器在放大\textbf{力矩}的同时，也在放大\textbf{所有非线性误差}。\\
+放大倍数 = 减速比 $i$ 本身。
+\end{keyinsight}
+
+\section{四种主流减速器结构}
+
+\subsection{行星减速器}
+
+\begin{itemize}
+  \item \textbf{结构}：太阳轮+行星轮+齿圈
+  \item \textbf{减速比范围}：3:1 -- 100:1（单级3--10，多级可达100）
+  \item \textbf{效率}：90--97\%（单级），多级略低
+  \item \textbf{特点}：结构紧凑、刚度高、背隙小、成本适中
+  \item \textbf{应用}：四足机器人、协作机器人、工业机器人小臂
+  \item \textbf{控制影响}：背隙（backlash）在换向时产生力矩死区
+\end{itemize}
+
+\subsection{谐波减速器}
+
+\begin{itemize}
+  \item \textbf{结构}：波发生器+柔轮+刚轮
+  \item \textbf{减速比范围}：30:1 -- 160:1
+  \item \textbf{效率}：70--85\%
+  \item \textbf{特点}：单级减速比大、零背隙、重量轻
+  \item \textbf{应用}：人形机器人协作臂、精密定位
+  \item \textbf{控制影响}：柔轮扭转刚度低，引入低频谐振；摩擦非线性强
+\end{itemize}
+
+\begin{cautionbox}{谐波减速器的"扭转柔性陷阱"}
+谐波减速器的柔轮在大力矩下会产生\textbf{显著扭转形变}（可达1--3角分/Nm）。\\
+这个柔性在力控中表现为：\\
+你发了力矩指令，实际输出要\textbf{等柔轮扭到对应角度}力矩才建立。\\
+这就是\textbf{力控相位滞后}的来源之一。
+\end{cautionbox}
+
+\subsection{直驱（Direct Drive）}
+
+\begin{itemize}
+  \item \textbf{结构}：电机直接连接负载，无减速器
+  \item \textbf{减速比}：1:1
+  \item \textbf{效率}：接近100\%
+  \item \textbf{特点}：零背隙、零摩擦（减速器部分）、响应极快
+  \item \textbf{应用}：高精度力矩控制、直接力控
+  \item \textbf{控制影响}：优点是力控带宽最高；缺点是需要巨大扭矩电机
+\end{itemize}
+
+\subsection{半直驱（Quasi-Direct Drive, QDD）}
+
+\begin{itemize}
+  \item \textbf{结构}：低减速比（通常6:1 -- 15:1）+ 大扭矩电机
+  \item \textbf{效率}：85--95\%
+  \item \textbf{特点}：介于直驱和传统减速器之间，兼顾力矩密度和柔顺性
+  \item \textbf{应用}：宇树H1、MIT Cheetah、四足机器人
+  \item \textbf{控制影响}：这是\textbf{最合适力控的折中方案}，详见第7章
+\end{itemize}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lcccc}
+\toprule
+\textbf{类型} & \textbf{减速比} & \textbf{效率} & \textbf{背隙} & \textbf{力控适合度} \\
+\midrule
+行星 & 3--100 & 90--97\% & 有 & ★★★☆☆ \\
+谐波 & 30--160 & 70--85\% & 无（但有柔性） & ★★☆☆☆ \\
+直驱 & 1 & $\approx$100\% & 无 & ★★★★★ \\
+半直驱 & 6--15 & 85--95\% & 极小 & ★★★★☆ \\
+\bottomrule
+\end{tabular}
+\caption{四种减速器类型对比}
+\label{tab:gearbox_types}
+\end{table}
+
+\section{减速比对控制的核心影响——误差放大公式}
+
+这是本书\textbf{最重要的公式}，请务必理解：
+
+\subsection{电机端误差的传递}
+
+假设电机端有一个误差源$\varepsilon_{\text{motor}}$（例如齿槽转矩、电流噪声、$K_t$波动），经过减速器后，输出端的误差为：
+
+\begin{equation}
+\varepsilon_{\text{out}} = \varepsilon_{\text{motor}} \times i
+\end{equation}
+
+\textbf{减速比$i$的物理意义}：它同时是力矩放大倍数和误差放大倍数。
+
+\subsection{具体量化例子}
+
+以$i=121$（你躯干关节的减速比）为例：
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lcc}
+\toprule
+\textbf{误差源} & \textbf{电机端幅值} & \textbf{关节输出端幅值（$i=121$）} \\
+\midrule
+齿槽转矩 & 0.01 Nm & \textbf{1.21 Nm} \\
+电流噪声（1\%满量程） & 0.005 Nm & \textbf{0.605 Nm} \\
+$K_t$波动（3\%） & 力矩偏移3\% & \textbf{力矩偏移3\%（相对放大）} \\
+轴承摩擦波动 & 0.005 Nm & \textbf{0.605 Nm} \\
+\bottomrule
+\end{tabular}
+\caption{$i=121$时误差放大效应}
+\label{tab:error_amplification}
+\end{table}
+
+\begin{cautionbox}{为什么i=121无法做电流力矩观测}
+因为电机端的微小误差（比如0.01 Nm的齿槽转矩）\\
+在关节端被放大到\textbf{1.21 Nm}。\\
+而你的关节最大力矩可能只有几十Nm。\\
+力矩观测的信噪比\textbf{完全被减速比的误差放大效应摧毁}。
+\end{cautionbox}
+
+\section{三大致命减速比区间}
+
+根据减速比的大小，机器人关节被分为\textbf{三个控制特性完全不同的区间}：
+
+\subsection{区间一：低减速比（$i \leq 25$）——可电流力矩观测}
+
+\begin{itemize}
+  \item 误差放大倍数小，电机端误差在可接受范围
+  \item 电流$\rightarrow$力矩的线性度好
+  \item 可以实现\textbf{无力矩传感器的力控}
+  \item 代表：宇树H1（$i\approx 10$）、MIT Cheetah（$i\approx 8$）
+\end{itemize}
+
+\subsection{区间二：中减速比（$25 < i < 80$）——勉强可用}
+
+\begin{itemize}
+  \item 误差已经明显，但可通过摩擦力补偿+前馈表部分抵消
+  \item 力控精度受限，但仍然可以做一些基本的柔顺控制
+  \item 代表：部分协作机器人关节
+\end{itemize}
+
+\subsection{区间三：高减速比（$i \geq 80$）——电流力矩观测彻底失效}
+
+\begin{itemize}
+  \item 误差放大倍数过大，电流观测的信号被噪声淹没
+  \item \textbf{必须使用输出端力矩传感器}才能做力控
+  \item 代表：你当前的躯干关节（$i=121$）、特斯拉Optimus（$i\approx 100$）
+\end{itemize}
+
+\begin{figure}[H]
+\centering
+\begin{tcolorbox}[colback=lightgray]
+\centering
+\textbf{减速比与控制可行性图谱}\\
+\vspace{5pt}
+$i \leq 25$：\hfill \textcolor{successgreen}{■ 电流力控可行} \hfill 宇树H1\\
+$25 < i < 80$：\hfill \textcolor{infoyellow}{■ 勉强可用} \hfill 部分协作臂\\
+$i \geq 80$：\hfill \textcolor{warnred}{■ 电流力控失效} \hfill 特斯拉/躯干关节\\
+\end{tcolorbox}
+\caption{减速比区间与电流力控可行性}
+\label{fig:ratio_zones}
+\end{figure}
+
+\section{减速器的其他非线性——摩擦、背隙、柔性}
+
+\subsection{摩擦}
+
+减速器引入的摩擦力矩通常远大于电机本身的摩擦力矩：
+
+\begin{equation}
+T_{\text{friction, gearbox}} \approx 5\text{--}20\% T_{\text{rated}}
+\end{equation}
+
+摩擦特性包括：
+\begin{itemize}
+  \item \textbf{Stribeck效应}：低速时摩擦随速度增加而减小——这是低速力控震荡的物理原因
+  \item \textbf{静摩擦+动摩擦差异}：启动时需要的力矩远大于维持运动需要的力矩
+  \item \textbf{温度依赖性}：冷启动摩擦比热机大2--3倍
+\end{itemize}
+
+\subsection{背隙（Backlash）}
+
+\begin{itemize}
+  \item 主要存在于行星减速器中，谐波/直驱/半直驱基本无背隙
+  \item 背隙导致\textbf{力矩死区}：在换向时，电机转了一个角度但输出端不动
+  \item 背隙会\textbf{破坏位置控制的精度}和\textbf{力矩控制的连续性}
+\end{itemize}
+
+\subsection{扭转柔性}
+
+\begin{itemize}
+  \item 谐波减速器的柔轮扭转刚度$K_{\text{harmonic}} \approx 10^3\text{--}10^4$ Nm/rad
+  \item 在大力矩下，扭转形变可达0.5--2度
+  \item 这引入了\textbf{额外的谐振模态}，降低力控带宽
+\end{itemize}
+
+\section{减速比选择的工程权衡}
+
+选择减速比不是越大越好，需要在以下因素之间权衡：
+
+\begin{table}[H]
+\centering
+\begin{tabular}{p{5cm}|p{5cm}}
+\toprule
+\textbf{增大减速比的好处} & \textbf{增大减速比的代价} \\
+\midrule
+\begin{minipage}{4.8cm}
+\vspace{2pt}
+$\bullet$ 电机力矩要求降低（更小/更轻的电机）\\
+$\bullet$ 更高的位置分辨率\\
+$\bullet$ 更好的自锁能力\\
+\vspace{2pt}
+\end{minipage}
+&
+\begin{minipage}{4.8cm}
+\vspace{2pt}
+$\bullet$ 误差放大\\
+$\bullet$ 力控灵敏度降低\\
+$\bullet$ 摩擦和效率损失增加\\
+$\bullet$ 输出端惯量反射降低（对外力不敏感）\\
+\vspace{2pt}
+\end{minipage} \\
+\bottomrule
+\end{tabular}
+\caption{减速比选择的权衡}
+\label{tab:ratio_tradeoff}
+\end{table}
+
+\begin{engineeringbox}{给硬件团队提需求的标准}
+当你需要为某个关节选择减速比时，先问自己一个问题：\\
+\textbf{这个关节需要做力控吗？}\\
+\begin{itemize}
+  \item 如果不能力控 → 选高减速比（便宜、定位准）
+  \item 如果需要力控 → 减速比必须 $\leq 25$
+  \item 如果必须高减速比又需要力控 → \textbf{必须加输出端力矩传感器}
+\end{itemize}
+\end{engineeringbox}
+
+\section*{本章小结}
+\addcontentsline{toc}{section}{本章小结}
+
+\begin{summarybox}{}
+\begin{enumerate}
+  \item 减速器是\textbf{力矩放大器也是误差放大器}，放大倍数=$i$
+  \item 三大减速比区间：$i \leq 25$（电流力控可行）、$25 < i < 80$（勉强可用）、$i \geq 80$（彻底失效）
+  \item 摩擦力矩+背隙+扭转柔性是减速器三大非线性源
+  \item \textbf{$i=121$的关节，电机端0.01 Nm的误差在关节端变成1.21 Nm}
+  \item 这就是为什么你躯干关节（$i=121$）\textbf{做不了电流力矩观测}——物理限制，不是算法问题
+\end{enumerate}
+\end{summarybox}
+
+\newpage

@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>永磁同步电机 PMSM 3D 交互展示</title>
+<!-- ====== 通过 CDN 引入 Three.js 及扩展库 ====== -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.162.0/examples/jsm/"
+  }
+}
+</script>
+<style>
+/* ─── 全局重置 ─── */
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;font-family:'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif}
+
+/* ─── 主布局 ─── */
+#app{display:flex;width:100%;height:100%}
+
+/* ─── 左侧控制面板 ─── */
+#panel{
+  width:280px;min-width:280px;height:100%;
+  background:linear-gradient(180deg,#f0f2f5 0%,#e6e9ed 100%);
+  border-right:1px solid #d0d3d8;display:flex;flex-direction:column;overflow-y:auto;
+  z-index:10;user-select:none
+}
+#panel::-webkit-scrollbar{width:4px}
+#panel::-webkit-scrollbar-thumb{background:#bbb;border-radius:2px}
+
+.panel-header{padding:20px 18px 12px;border-bottom:1px solid #d0d3d8;background:rgba(255,255,255,0.5)}
+.panel-header h1{font-size:18px;font-weight:700;color:#1a1a2e;letter-spacing:0.5px}
+.panel-header p{font-size:12px;color:#777;margin-top:3px}
+
+.panel-section{padding:14px 18px;border-bottom:1px solid #d8dbe0}
+.panel-section h2{font-size:13px;font-weight:600;color:#444;margin-bottom:10px}
+
+/* ─── 按钮 ─── */
+.btn-group{display:flex;gap:8px;flex-wrap:wrap}
+.btn{
+  min-width:70px;padding:8px 12px;border:none;border-radius:6px;
+  font-size:13px;font-weight:500;cursor:pointer;
+  transition:all 0.15s ease;text-align:center
+}
+.btn-primary{background:#1a1a2e;color:#fff;flex:1}
+.btn-primary:hover{background:#2d2d4e}
+.btn-secondary{background:#d0d3d8;color:#333;flex:1}
+.btn-secondary:hover{background:#b8bcc3}
+.btn-accent{background:#2980b9;color:#fff}
+.btn-accent:hover{background:#2471a3}
+.btn-sm{padding:5px 10px;font-size:12px}
+.btn-active{background:#1a1a2e;color:#fff}
+
+/* ─── 视角按钮行 ─── */
+.view-row{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+.view-row .btn{flex:0 0 auto}
+
+/* ─── 部件勾选列表 ─── */
+.part-list{list-style:none}
+.part-list li{
+  display:flex;align-items:center;gap:10px;
+  padding:7px 0;cursor:pointer;border-radius:4px;transition:background 0.12s
+}
+.part-list li:hover{background:rgba(255,255,255,0.6)}
+.part-list input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:#2980b9}
+.part-color{width:14px;height:14px;border-radius:3px;border:1px solid rgba(0,0,0,0.12);flex-shrink:0}
+.part-name{font-size:13px;color:#333;flex:1}
+.part-badge{font-size:10px;color:#999}
+
+/* ─── 3D 视图容器 ─── */
+#canvas-container{flex:1;height:100%;position:relative;overflow:hidden;background:linear-gradient(135deg,#f5f6fa 0%,#eef0f5 100%)}
+#canvas-container canvas{display:block}
+
+/* ─── 右下角部件信息卡 ─── */
+#part-info{
+  position:absolute;bottom:20px;right:20px;
+  background:rgba(255,255,255,0.92);backdrop-filter:blur(8px);
+  border:1px solid #e0e0e0;border-radius:10px;
+  padding:14px 18px;max-width:280px;
+  box-shadow:0 4px 20px rgba(0,0,0,0.08);display:none;z-index:10
+}
+#part-info .info-title{font-size:15px;font-weight:700;color:#1a1a2e}
+#part-info .info-desc{font-size:12px;color:#666;margin-top:4px;line-height:1.5}
+
+/* ─── 底部操作提示 ─── */
+#hint{
+  position:absolute;bottom:20px;left:50%;transform:translateX(-50%);
+  font-size:12px;color:#999;pointer-events:none;
+  z-index:5;background:rgba(255,255,255,0.7);padding:6px 14px;border-radius:20px
+}
+
+/* ─── 响应式 ─── */
+@media(max-width:768px){
+  #panel{width:200px;min-width:200px}
+  .panel-header h1{font-size:15px}
+  .panel-section{padding:10px 14px}
+  #part-info{max-width:220px;padding:10px 14px;bottom:14px;right:14px}
+}
+@media(max-width:500px){
+  #panel{width:100%;min-width:100%;height:auto;max-height:50%;border-right:none;border-bottom:1px solid #d0d3d8}
+  #app{flex-direction:column-reverse}
+  #part-info{bottom:auto;top:14px;right:14px;max-width:180px}
+  #hint{display:none}
+}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ====== 左侧控制面板 ====== -->
+  <div id="panel">
+    <div class="panel-header">
+      <h1>永磁同步电机</h1>
+      <p>PMSM · 3D 交互展示</p>
+    </div>
+
+    <div class="panel-section">
+      <h2>视图控制</h2>
+      <div class="btn-group">
+        <button class="btn btn-primary" id="btn-explode">爆炸图</button>
+        <button class="btn btn-secondary" id="btn-reset">复位</button>
+      </div>
+      <div class="view-row">
+        <button class="btn btn-sm btn-accent" data-view="front">正视图</button>
+        <button class="btn btn-sm btn-accent" data-view="side">侧视图</button>
+        <button class="btn btn-sm btn-accent" data-view="top">俯视图</button>
+        <button class="btn btn-sm btn-accent" data-view="iso">重置视角</button>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <h2>部件显示 <span style="font-weight:400;color:#999;font-size:11px">（点击勾选切换可见性）</span></h2>
+      <ul class="part-list" id="part-list">
+        <li data-part="stator"><input type="checkbox" checked><span class="part-color" style="background:#4a90d9"></span><span class="part-name">定子</span><span class="part-badge">铁芯</span></li>
+        <li data-part="windings"><input type="checkbox" checked><span class="part-color" style="background:#b87333"></span><span class="part-name">绕组</span><span class="part-badge">三相铜线</span></li>
+        <li data-part="rotor"><input type="checkbox" checked><span class="part-color" style="background:#666"></span><span class="part-name">转子</span><span class="part-badge">铁芯</span></li>
+        <li data-part="magnets"><input type="checkbox" checked><span class="part-color" style="background:#c0392b"></span><span class="part-name">永磁体</span><span class="part-badge">钕铁硼</span></li>
+        <li data-part="shaft"><input type="checkbox" checked><span class="part-color" style="background:#bbb"></span><span class="part-name">电机轴</span><span class="part-badge">精磨钢</span></li>
+        <li data-part="bearings"><input type="checkbox" checked><span class="part-color" style="background:#555"></span><span class="part-name">轴承</span><span class="part-badge">滚动轴承</span></li>
+        <li data-part="endcaps"><input type="checkbox" checked><span class="part-color" style="background:#2c3e50"></span><span class="part-name">端盖</span><span class="part-badge">前后</span></li>
+        <li data-part="terminalbox"><input type="checkbox" checked><span class="part-color" style="background:#e67e22"></span><span class="part-name">接线盒</span><span class="part-badge">端子+电缆</span></li>
+        <li data-part="housing"><input type="checkbox" checked><span class="part-color" style="background:#1a1a2e"></span><span class="part-name">外壳</span><span class="part-badge">半透明</span></li>
+      </ul>
+    </div>
+
+    <div class="panel-section" style="flex:1;border-bottom:none">
+      <h2>操作说明</h2>
+      <div style="font-size:12px;color:#888;line-height:1.8">
+        <div>🖱 左键拖拽 — 旋转</div>
+        <div>🔄 滚轮 — 缩放</div>
+        <div>✋ 右键拖拽 — 平移</div>
+        <div>👆 点击部件 — 查看详情</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====== 3D 视图 ====== -->
+  <div id="canvas-container">
+    <div id="part-info">
+      <div class="info-title" id="info-title"></div>
+      <div class="info-desc" id="info-desc"></div>
+    </div>
+    <div id="hint">🖱 左键旋转 · 滚轮缩放 · 点击部件查看详情</div>
+  </div>
+
+</div>
+
+<!-- 主脚本 -->
+<script type="module" src="pmsm-viewer.js"></script>
+</body>
+</html>

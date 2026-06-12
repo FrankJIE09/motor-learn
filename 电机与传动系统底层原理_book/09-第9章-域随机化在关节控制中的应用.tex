@@ -1,0 +1,194 @@
+\chapter{域随机化在关节控制中的应用}
+
+\section{什么是域随机化}
+
+域随机化（Domain Randomization, DR）是一种在仿真中通过随机化物理参数，使训练出来的策略能够成功迁移到真实机器人上的方法。其核心思想是：\textbf{如果仿真环境足够多样，以至于真实环境看起来只是其中的一种变体}，那么模型在仿真中学会的策略就能直接用于真实系统，而无需额外的域适配。
+
+\begin{equation}
+\text{DR 核心假设:} \quad
+p_{\text{real}}(\tau) \in \{p_{\text{sim}}(\tau; \phi) \;|\; \phi \sim \Phi\}
+\end{equation}
+
+其中 \(\tau\) 是系统轨迹，\(\phi\) 是随机化的物理参数，\(\Phi\) 是参数的随机化分布。
+
+域随机化最早由 OpenAI 在 2017 年提出，用于将仿真中训练的抓取策略直接迁移到真实机器人上，并随后在 Dactyl 灵巧手中取得了里程碑式的成果。
+
+\section{为什么关节控制需要域随机化}
+
+真实机器人关节的物理参数永远无法精确建模：
+
+\begin{itemize}
+    \item \textbf{摩擦}：摩擦力矩随温度、润滑状态、磨损程度变化，低温时启动摩擦力矩可达额定值的 30\%
+    \item \textbf{齿槽转矩}：周期性波动，其幅值和波形因制造公差而异
+    \item \textbf{惯量}：负载变化时等效惯量改变，高减速比下负载惯量被放大 \(N^2\) 倍
+    \item \textbf{刚度与谐振}：轴系扭转刚度受温度、装配预紧力影响
+    \item \textbf{传动效率}：谐波减速机效率在 60\%\textasciitilde 90\% 之间波动
+\end{itemize}
+
+如果仿真中只使用一组固定参数来训练控制器，在真实机器人上往往会表现不佳。
+
+\begin{engineeringbox}{Sim-to-Real 迁移的瓶颈}
+    真实关节的摩擦力矩可因低温增大 5\textasciitilde 6 倍，而仿真中如果只用一个固定的摩擦系数，控制器在真实机器人上会出现严重的跟踪误差甚至震荡。
+\end{engineeringbox}
+
+\section{域随机化的核心参数}
+
+在机器人关节控制中，通常随机化以下物理参数：
+
+\subsection{动力学参数}
+
+\begin{equation}
+\begin{aligned}
+\text{质量} &\quad m \sim \mathcal{U}(m_0 \times 0.8,\; m_0 \times 1.2) \\
+\text{惯量} &\quad I \sim \mathcal{U}(I_0 \times 0.5,\; I_0 \times 1.5) \\
+\text{质心位置} &\quad r_{\text{CoM}} \sim \mathcal{U}(r_0 - \Delta r,\; r_0 + \Delta r)
+\end{aligned}
+\end{equation}
+
+\subsection{摩擦参数}
+
+\begin{equation}
+\begin{aligned}
+\text{库仑摩擦} &\quad \tau_c \sim \mathcal{U}(0.0,\; \tau_{\text{rated}} \times 0.3) \\
+\text{粘滞摩擦} &\quad b \sim \mathcal{U}(0.0,\; b_0 \times 2.0) \\
+\text{静摩擦}  &\quad \tau_s \sim \mathcal{U}(\tau_c,\; \tau_c \times 1.5)
+\end{aligned}
+\end{equation}
+
+\subsection{力矩相关参数}
+
+\begin{equation}
+\begin{aligned}
+\text{齿槽转矩幅值} &\quad A_{\text{cog}} \sim \mathcal{U}(0,\; A_{\text{max}}) \\
+\text{转矩常数} &\quad K_t \sim \mathcal{U}(K_{t0} \times 0.9,\; K_{t0} \times 1.1) \\
+\text{传动效率} &\quad \eta \sim \mathcal{U}(0.6,\; 0.9)
+\end{aligned}
+\end{equation}
+
+\begin{equation}
+\text{仿真中的关节动力学:}
+\quad
+I_{\text{eff}} \ddot{q} = \underbrace{K_t \cdot i_q}_{\text{电磁扭矩}} -
+\underbrace{\tau_f(\dot{q})}_{\text{摩擦+齿槽}} -
+\underbrace{\tau_g(q)}_{\text{重力}} +
+\underbrace{\epsilon_{\text{noise}}}_{\text{观测噪声}}
+\end{equation}
+
+\subsection{观测噪声}
+
+\begin{equation}
+\begin{aligned}
+\text{位置噪声} &\quad \sigma_q \sim \mathcal{U}(0.0001,\; 0.01) \text{ rad} \\
+\text{速度噪声} &\quad \sigma_{\dot{q}} \sim \mathcal{U}(0.001,\; 0.1) \text{ rad/s} \\
+\text{扭矩噪声} &\quad \sigma_{\tau} \sim \mathcal{U}(0.01,\; 0.1) \text{ Nm}
+\end{aligned}
+\end{equation}
+
+\section{随机化对关节控制器的具体影响}
+
+\subsection{摩擦随机化 vs 力控精度}
+
+真实机器人在低温启动时，摩擦力矩可能达到额定扭矩的 30\%。如果 CST 模式下的力控策略在仿真中只在 5\% 摩擦下训练，部署后低温启动会导致：
+
+\begin{itemize}
+    \item 关节"卡住"不动，直到扭矩指令累积到超过实际摩擦
+    \item 一旦超过阈值，关节突然滑动，造成阶梯式位置跳跃（粘滑现象 stick-slip）
+\end{itemize}
+
+通过在仿真中将库仑摩擦随机化到 \([0, 0.3 \times \tau_{\text{rated}}]\)，策略学会自动在启动时额外增加扭矩，达到平稳启动。
+
+\subsection{齿槽转矩随机化}
+
+齿槽转矩是一个与转子位置相关的周期性扰动。如果在仿真中不包含齿槽转矩，而在真实机器人中存在，CST 力控模式下会出现：
+
+\begin{itemize}
+    \item 每个齿槽周期内扭矩输出波动
+    \item 低速运行时关节"一顿一顿"
+\end{itemize}
+
+在仿真中添加随机化齿槽转矩后，控制器学会计入这一周期性扰动，在 CST 模式下输出经过补偿的电流指令。
+
+\subsection{Kt 随机化}
+
+转矩常数 \(K_t\) 并非恒定值，它随温度升高而降低（永磁体高温退磁）。\(K_t\) 的变化直接导致同样的电流指令产生不同的实际扭矩：
+
+\begin{equation}
+\Delta \tau = \Delta K_t \cdot i_q
+\end{equation}
+
+在 CST 模式下，如果实际 \(K_t\) 比仿真中假设的低 10\%，则实际输出扭矩比预期低 10\%。通过在训练中将 \(K_t\) 随机化 \(\pm 10\%\)，控制器学会使用实际扭矩反馈（类似于 0x6077）而非开环电流指令。
+
+\section{随机化策略与实施}
+
+\subsection{参数分布的选择}
+
+\begin{itemize}
+    \item \textbf{均匀分布} \(\mathcal{U}(a, b)\)：最简单常用，覆盖范围明确
+    \item \textbf{正态分布} \(\mathcal{N}(\mu, \sigma)\)：参数接近标称值，偶尔出现极端值
+    \item \textbf{对数均匀分布}：用于摩擦力、阻尼等跨度数量级的参数
+\end{itemize}
+
+\subsection{随机化时机}
+
+\begin{itemize}
+    \item \textbf{Episode-level}：每回合开始随机化一次，保持回合内参数不变（最常用）
+    \item \textbf{Time-level}：每个时间步重新采样，模拟时变参数（如温度缓慢变化）
+    \item \textbf{Domain-level}：所有环境共享一组随机参数，适合并行训练
+\end{itemize}
+
+\subsection{Practical 实践建议}
+
+\begin{debugbox}{从仿真到真机的 DR 配置}
+\begin{enumerate}
+    \item 先从标称参数开始，验证仿真动力学与真实关节基本匹配
+    \item 逐一添加随机化参数，每次只加 1\textasciitilde 2 个，观察策略鲁棒性的变化
+    \item 优先随机化最不确定的参数（通常：摩擦 > 惯量 > Kt > 齿槽转矩）
+    \item 随机化范围从 \([0.95, 1.05]\) 开始，逐步扩大到策略能容忍的最大范围
+    \item 在真实关节上测试时，如果性能与仿真差距大，回到第 2 步扩大对应参数的随机化范围
+\end{enumerate}
+\end{debugbox}
+
+\section{与同川 TCHR 伺服驱动器的结合}
+
+结合同川 TCHR 伺服驱动器的对象字典，域随机化中的参数可与实际可读/可设置的参数对应：
+
+\begin{table}[H]
+\centering
+\caption{域随机化参数与同川 TCHR 对象字典对应关系}
+\begin{tabular}{c|c|c}
+\toprule
+\textbf{仿真随机化参数} & \textbf{TCHR 对象} & \textbf{随机化范围（建议）} \\
+\midrule
+转矩常数 \(K_t\) & 0x6076 (额定扭矩) & \(\pm 10\%\) \\
+电机惯量 & Pr5.15 (负载惯量比) & \(\pm 30\%\) \\
+扭矩限幅 & 0x6072 (最大扭矩) & \(\pm 20\%\) \\
+速度限幅 & 0x3401 (CST 速度限幅) & \(\pm 20\%\) \\
+低速摩擦补偿 & Pr5.24/5.25 (动摩擦力补偿) & \(0 \sim 30\% \tau_{\text{rated}}\) \\
+齿槽转矩补偿 & Pr5.27/5.28 (正/反向转矩补偿) & \(0 \sim 5\% \tau_{\text{rated}}\) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{keyinsight}{域随机化的本质}
+    域随机化的本质不是让仿真更"精确"，而是让仿真更"混乱"。物理模型不需要完美匹配真实系统，只需要覆盖真实系统可能出现的全部变化范围。
+\end{keyinsight}
+
+\section{局限性}
+
+\begin{cautionbox}{域随机化的边界}
+\begin{itemize}
+    \item \textbf{过度随机化}：范围过大可能导致策略过于保守，性能下降
+    \item \textbf{覆盖盲区}：如果真实环境的某些特性完全不在随机化范围内（如结构性共振），DR 无法帮助
+    \item \textbf{计算成本}：参数范围越大，需要的仿真数据量越大，训练时间越长
+    \item \textbf{补偿上限}：DR 不能创造出真实硬件不具备的能力
+\end{itemize}
+\end{cautionbox}
+
+\begin{summarybox}{}
+\begin{enumerate}
+  \item \textbf{域随机化}通过在仿真中随机化物理参数（摩擦、惯量、Kt、齿槽转矩等），使策略在真实机器人上更鲁棒
+  \item 关节控制中最需要随机化的参数依次为：\textbf{摩擦 > 惯量 > Kt > 齿槽转矩}
+  \item 参数随机化范围应根据仿真与真机的差距\textbf{逐步扩大}
+  \item 同川 TCHR 的对象字典为 DR 参数提供了真机对照和验证手段
+\end{enumerate}
+\end{summarybox}

@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>双连杆远程皮带传动机械臂仿真</title>
+    <!-- 引入 Tailwind CSS 构建现代工业化 UI -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 FontAwesome 字体图标 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .text-neon-cyan {
+            color: #06b6d4;
+            text-shadow: 0 0 8px rgba(6, 182, 212, 0.4);
+        }
+        .text-neon-orange {
+            color: #f97316;
+            text-shadow: 0 0 8px rgba(249, 115, 22, 0.4);
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans select-none overflow-x-hidden">
+
+    <!-- 页眉导航 -->
+    <header class="border-b border-slate-900 bg-slate-900/60 backdrop-blur-md sticky top-0 z-50 px-6 py-4">
+        <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+                <div class="p-2.5 bg-gradient-to-tr from-cyan-600 to-orange-600 rounded-xl text-white shadow-md">
+                    <i class="fa-solid fa-compass-drafting text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold tracking-tight bg-gradient-to-r from-cyan-400 to-orange-400 bg-clip-text text-transparent">
+                        远程驱动双连杆机械臂 (图 8.8 模型)
+                    </h1>
+                    <p class="text-xs text-slate-400">教科书经典共轴皮带传动运动学仿真</p>
+                </div>
+            </div>
+            
+            <!-- 运动学核心公式 -->
+            <div class="flex items-center gap-4 text-xs font-mono bg-slate-900/90 px-4 py-2 rounded-lg border border-slate-800">
+                <div class="flex flex-col">
+                    <span class="text-cyan-400">连杆 1 角: q₁ = θ_s₁</span>
+                    <span class="text-orange-400">连杆 2 角: q₂ = θ_s₁ + θ_s₂</span>
+                </div>
+                <div class="h-6 w-px bg-slate-800"></div>
+                <div class="text-slate-400 text-center">
+                    <span>关节 2 相对角:<br>Δq = θ_s₂</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- 主体内容布局 -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        <!-- 左侧交互式 Canvas 视口 -->
+        <section class="lg:col-span-8 flex flex-col gap-4">
+            <div class="relative bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl flex-1 flex flex-col min-h-[500px]">
+                
+                <!-- 顶层状态与控制工具栏 -->
+                <div class="absolute top-4 left-4 right-4 z-10 flex items-center justify-between pointer-events-none">
+                    <div class="bg-slate-950/90 backdrop-blur px-3 py-1.5 rounded-lg border border-slate-800 text-xs font-mono flex items-center gap-2">
+                        <span class="h-2 w-2 rounded-full bg-cyan-500 animate-pulse"></span>
+                        <span class="text-slate-300" id="mode-badge">当前模式: 手动静止</span>
+                    </div>
+                    <div class="flex gap-2 pointer-events-auto">
+                        <button id="btn-toggle-grid" class="bg-slate-950/90 hover:bg-slate-800 text-slate-300 hover:text-white px-3 py-1.5 rounded-lg border border-slate-800 text-xs flex items-center gap-1.5 transition">
+                            <i class="fa-solid fa-border-all"></i> 网格
+                        </button>
+                        <button id="btn-clear-trace" class="bg-slate-950/90 hover:bg-slate-800 text-slate-300 hover:text-white px-3 py-1.5 rounded-lg border border-slate-800 text-xs flex items-center gap-1.5 transition">
+                            <i class="fa-solid fa-trash-can"></i> 清除轨迹
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 仿真画布容器 -->
+                <div class="flex-1 relative w-full h-full min-h-[460px]">
+                    <canvas id="manipulatorCanvas" class="absolute inset-0 w-full h-full cursor-crosshair block"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <!-- 右侧控制面板与遥测参数 -->
+        <section class="lg:col-span-4 flex flex-col gap-6">
+            
+            <!-- 实时遥测数据 -->
+            <div class="glass-panel p-5 rounded-2xl flex flex-col gap-4 shadow-xl">
+                <h2 class="text-sm font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                    <i class="fa-solid fa-chart-line text-cyan-400"></i> 实时遥测参数
+                </h2>
+                
+                <div class="grid grid-cols-2 gap-3">
+                    <!-- 驱动器 1 角度 -->
+                    <div class="bg-slate-950/60 p-3 rounded-xl border border-slate-800">
+                        <div class="text-[10px] text-slate-400 uppercase font-mono">驱动器 1 (θ_s₁)</div>
+                        <div class="flex items-baseline justify-between mt-1">
+                            <span class="text-xl font-mono font-bold text-cyan-400" id="val-theta1">0.0°</span>
+                        </div>
+                        <div class="w-full bg-slate-900 h-1 rounded-full mt-2 overflow-hidden">
+                            <div id="bar-theta1" class="bg-cyan-500 h-full transition-all duration-75" style="width: 50%;"></div>
+                        </div>
+                    </div>
+
+                    <!-- 驱动器 2 角度 -->
+                    <div class="bg-slate-950/60 p-3 rounded-xl border border-slate-800">
+                        <div class="text-[10px] text-slate-400 uppercase font-mono">驱动器 2 (θ_s₂)</div>
+                        <div class="flex items-baseline justify-between mt-1">
+                            <span class="text-xl font-mono font-bold text-orange-400" id="val-theta2">0.0°</span>
+                        </div>
+                        <div class="w-full bg-slate-900 h-1 rounded-full mt-2 overflow-hidden">
+                            <div id="bar-theta2" class="bg-orange-500 h-full transition-all duration-75" style="width: 50%;"></div>
+                        </div>
+                    </div>
+
+                    <!-- 连杆 1 绝对角度 -->
+                    <div class="bg-slate-950/60 p-3 rounded-xl border border-slate-800">
+                        <div class="text-[10px] text-slate-400 uppercase font-mono">连杆 1 角度 (q₁)</div>
+                        <div class="text-lg font-mono font-bold text-cyan-300 mt-1" id="val-q1">0.0°</div>
+                    </div>
+
+                    <!-- 连杆 2 绝对角度 -->
+                    <div class="bg-slate-950/60 p-3 rounded-xl border border-slate-800">
+                        <div class="text-[10px] text-slate-400 uppercase font-mono">连杆 2 角度 (q₂)</div>
+                        <div class="text-lg font-mono font-bold text-orange-300 mt-1" id="val-q2">0.0°</div>
+                    </div>
+                </div>
+
+                <!-- 末端执行器坐标 -->
+                <div class="bg-slate-950/80 p-3 rounded-xl border border-slate-800 flex justify-between items-center text-xs font-mono">
+                    <div>
+                        <span class="text-slate-400 block text-[10px] uppercase">末端执行器坐标 (X, Y)</span>
+                        <span id="val-ee-coords" class="text-purple-300 font-bold text-sm">X: 0.0, Y: 0.0</span>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-slate-400 block text-[10px] uppercase">肘关节相对角 (q₂-q₁)</span>
+                        <span id="val-rel-angle" class="text-emerald-400 font-bold text-sm">Δ: 0.0°</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 控制面板操作 -->
+            <div class="glass-panel p-5 rounded-2xl flex flex-col gap-4 shadow-xl">
+                <h2 class="text-sm font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                    <i class="fa-solid fa-gamepad text-purple-400"></i> 控制与输入
+                </h2>
+
+                <!-- 4 个经典控制按钮 -->
+                <div class="grid grid-cols-2 gap-2.5">
+                    <button id="btn-act1" class="flex flex-col items-center justify-center p-3 rounded-xl bg-slate-900 border border-slate-800 hover:border-cyan-500/50 text-slate-300 hover:text-cyan-400 transition group">
+                        <i class="fa-solid fa-circle-notch text-lg mb-1 group-hover:rotate-45 transition-transform"></i>
+                        <span class="text-xs font-medium">仅驱动器 1 旋转</span>
+                    </button>
+                    <button id="btn-act2" class="flex flex-col items-center justify-center p-3 rounded-xl bg-slate-900 border border-slate-800 hover:border-orange-500/50 text-slate-300 hover:text-orange-400 transition group">
+                        <i class="fa-solid fa-spinner text-lg mb-1 group-hover:rotate-90 transition-transform"></i>
+                        <span class="text-xs font-medium">仅驱动器 2 旋转</span>
+                    </button>
+                    <button id="btn-both" class="col-span-2 flex items-center justify-center gap-2 py-3 rounded-xl bg-gradient-to-r from-cyan-950/40 to-orange-950/40 hover:from-cyan-900/40 hover:to-orange-900/40 border border-slate-800 hover:border-purple-500/50 text-purple-300 hover:text-white transition">
+                        <i class="fa-solid fa-rotate text-sm animate-spin" style="animation-duration: 6s;"></i>
+                        <span class="text-xs font-bold uppercase tracking-wider">双驱动器同步转动</span>
+                    </button>
+                    <button id="btn-reset" class="col-span-2 py-2.5 rounded-xl bg-red-950/20 hover:bg-red-950/40 border border-red-500/20 hover:border-red-500/40 text-red-400 hover:text-red-300 font-bold text-xs uppercase tracking-wider transition flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-arrow-rotate-left"></i> 重置系统
+                    </button>
+                </div>
+
+                <div class="h-px bg-slate-800/80 my-2"></div>
+
+                <!-- 手动滑块精准控制 -->
+                <div class="flex flex-col gap-4">
+                    <!-- 滑块：驱动器 1 -->
+                    <div class="flex flex-col gap-1.5">
+                        <div class="flex justify-between text-xs">
+                            <span class="text-slate-400 font-semibold">手动调节驱动器 1 (θ_s₁)</span>
+                            <span class="font-mono text-cyan-400" id="slider-m1-lbl">35°</span>
+                        </div>
+                        <input id="slider-m1" type="range" min="-180" max="180" value="35" class="w-full h-1.5 bg-slate-950 rounded-lg appearance-none cursor-pointer accent-cyan-500">
+                    </div>
+
+                    <!-- 滑块：驱动器 2 -->
+                    <div class="flex flex-col gap-1.5">
+                        <div class="flex justify-between text-xs">
+                            <span class="text-slate-400 font-semibold">手动调节驱动器 2 (θ_s₂)</span>
+                            <span class="font-mono text-orange-400" id="slider-m2-lbl">45°</span>
+                        </div>
+                        <input id="slider-m2" type="range" min="-180" max="180" value="45" class="w-full h-1.5 bg-slate-950 rounded-lg appearance-none cursor-pointer accent-orange-500">
+                    </div>
+
+                    <!-- 运行速度 -->
+                    <div class="flex flex-col gap-1.5">
+                        <div class="flex justify-between text-xs">
+                            <span class="text-slate-400 font-semibold">仿真播放速度</span>
+                            <span class="font-mono text-purple-400" id="slider-speed-lbl">1.0x</span>
+                        </div>
+                        <input id="slider-speed" type="range" min="0.2" max="2.5" step="0.1" value="1.0" class="w-full h-1.5 bg-slate-950 rounded-lg appearance-none cursor-pointer accent-purple-500">
+                    </div>
+                </div>
+            </div>
+
+            <!-- 教科书结构原理解释 -->
+            <div class="glass-panel p-4 rounded-2xl text-xs text-slate-400 leading-relaxed flex flex-col gap-2 border-dashed">
+                <h3 class="font-bold text-slate-300 flex items-center gap-1.5">
+                    <i class="fa-solid fa-circle-nodes text-orange-400"></i> 传动结构与运动学解析
+                </h3>
+                <p>
+                    该仿真严格遵循教科书中的<b>图 8.8 远程驱动双连杆机械臂</b>模型：
+                </p>
+                <ul class="space-y-1 list-disc pl-4 text-slate-300">
+                    <li><strong class="text-cyan-400">驱动器 1</strong> 同轴直接连接关节 1，驱使连杆 1 旋转：<code class="bg-slate-950 px-1 rounded">q₁ = θ_s₁</code></li>
+                    <li><strong class="text-orange-400">驱动器 2</strong> 固定在基座侧边。通过基座皮带，将动力传输至套在关节 1 轴上的空套带轮；再由连杆 1 内部的次级皮带传输至肘部带轮。因此存在运动耦合：<code class="bg-slate-950 px-1 rounded">q₂ = θ_s₁ + θ_s₂</code></li>
+                </ul>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- 页脚 -->
+    <footer class="border-t border-slate-900 bg-slate-950 text-center py-4 text-xs text-slate-500 font-mono mt-auto">
+        远程驱动连杆机械传动系统动态仿真 &copy; 2026.
+    </footer>
+
+    <!-- JavaScript 动画与仿真引擎 -->
+    <script>
+        // 获取 DOM 元素
+        const canvas = document.getElementById('manipulatorCanvas');
+        const ctx = canvas.getContext('2d');
+        const modeBadge = document.getElementById('mode-badge');
+        
+        const valTheta1 = document.getElementById('val-theta1');
+        const valTheta2 = document.getElementById('val-theta2');
+        const valQ1 = document.getElementById('val-q1');
+        const valQ2 = document.getElementById('val-q2');
+        const barTheta1 = document.getElementById('bar-theta1');
+        const barTheta2 = document.getElementById('bar-theta2');
+        const valEECoords = document.getElementById('val-ee-coords');
+        const valRelAngle = document.getElementById('val-rel-angle');
+
+        const btnAct1 = document.getElementById('btn-act1');
+        const btnAct2 = document.getElementById('btn-act2');
+        const btnBoth = document.getElementById('btn-both');
+        const btnReset = document.getElementById('btn-reset');
+        const btnToggleGrid = document.getElementById('btn-toggle-grid');
+        const btnClearTrace = document.getElementById('btn-clear-trace');
+
+        const sliderM1 = document.getElementById('slider-m1');
+        const sliderM2 = document.getElementById('slider-m2');
+        const sliderSpeed = document.getElementById('slider-speed');
+        const sliderM1Lbl = document.getElementById('slider-m1-lbl');
+        const sliderM2Lbl = document.getElementById('slider-m2-lbl');
+        const sliderSpeedLbl = document.getElementById('slider-speed-lbl');
+
+        // 系统角度状态 (角度单位值)
+        let theta1 = 35; // 驱动器 1 的角度
+        let theta2 = 45; // 驱动器 2 的角度
+        let q1 = 35;     // 连杆 1 的绝对夹角
+        let q2 = 80;     // 连杆 2 的绝对夹角 (q1 + theta2)
+
+        // 机械臂几何参数大小 (像素单位)
+        const L1 = 150; // 连杆 1 长度
+        const L2 = 130; // 连杆 2 长度
+        
+        // 皮带轮半径规格
+        const rDrive = 18;     // 基座上的主动带轮半径
+        const rCoaxial = 32;   // 关节 1 (肩部) 的大型共轴空套带轮半径
+        const rElbow = 22;     // 关节 2 (肘部) 的从动带轮半径
+
+        // 动画控制
+        let currentMode = 'idle'; // 运行模式: 'idle', 'act1_only', 'act2_only', 'both'
+        let speedModifier = 1.0;
+        let time = 0;
+        let showGrid = true;
+
+        // 皮带纹路移动增量 (模拟运转动画)
+        let beltPhase1 = 0;
+        let beltPhase2 = 0;
+
+        // 末端轨迹点记录
+        let tracePath = [];
+        const maxTraceLength = 250;
+
+        // 现代配色规范
+        const colors = {
+            base: '#1e293b',
+            grid: 'rgba(30, 41, 59, 0.25)',
+            link1: '#06b6d4',      // 亮青色
+            link2: '#f97316',      // 橙色
+            belt1: '#c084fc',      // 基座第一条紫色皮带
+            belt2: '#a855f7',      // 连杆第二条亮紫色皮带
+            text: '#f8fafc',
+            dimText: '#64748b'
+        };
+
+        // 高清屏支持自适应缩放
+        function resizeCanvas() {
+            const rect = canvas.getBoundingClientRect();
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = rect.width * dpr;
+            canvas.height = rect.height * dpr;
+            ctx.scale(dpr, dpr);
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        const rad = deg => deg * Math.PI / 180;
+        const deg = rad => rad * 180 / Math.PI;
+
+        // 刷新遥测及 UI 面板数值
+        function updateUiIndicators() {
+            // 教科书核心公式:
+            q1 = theta1;
+            q2 = theta1 + theta2;
+
+            // 限制输入极值
+            sliderM1.value = Math.round(theta1);
+            sliderM2.value = Math.round(theta2);
+            sliderM1Lbl.textContent = `${Math.round(theta1)}°`;
+            sliderM2Lbl.textContent = `${Math.round(theta2)}°`;
+
+            // 参数字面呈现
+            valTheta1.textContent = `${theta1.toFixed(1)}°`;
+            valTheta2.textContent = `${theta2.toFixed(1)}°`;
+            valQ1.textContent = `${q1.toFixed(1)}°`;
+            valQ2.textContent = `${q2.toFixed(1)}°`;
+
+            // 肘部相对关节角
+            valRelAngle.textContent = `Δ: ${(q2 - q1).toFixed(1)}°`;
+
+            // 参数条百分比更新
+            barTheta1.style.width = `${((theta1 + 180) / 360) * 100}%`;
+            barTheta2.style.width = `${((theta2 + 180) / 360) * 100}%`;
+        }
+
+        // 修改按钮激活时的 UI 状态
+        function updateActiveButtonUI() {
+            [btnAct1, btnAct2, btnBoth].forEach(btn => {
+                btn.classList.remove('border-cyan-500', 'border-orange-500', 'border-purple-500', 'bg-slate-800');
+            });
+
+            if (currentMode === 'act1_only') {
+                btnAct1.classList.add('border-cyan-500', 'bg-slate-800');
+                modeBadge.innerHTML = '<span class="h-2 w-2 rounded-full bg-cyan-400 animate-ping"></span> 仅驱动器 1 运行';
+            } else if (currentMode === 'act2_only') {
+                btnAct2.classList.add('border-orange-500', 'bg-slate-800');
+                modeBadge.innerHTML = '<span class="h-2 w-2 rounded-full bg-orange-400 animate-ping"></span> 仅驱动器 2 运行';
+            } else if (currentMode === 'both') {
+                btnBoth.classList.add('border-purple-500', 'bg-slate-800');
+                modeBadge.innerHTML = '<span class="h-2 w-2 rounded-full bg-purple-400 animate-ping"></span> 双驱协调联运';
+            } else {
+                modeBadge.innerHTML = '<span class="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span> 手动静止模式';
+            }
+        }
+
+        // 按钮事件监听器
+        btnAct1.addEventListener('click', () => {
+            currentMode = currentMode === 'act1_only' ? 'idle' : 'act1_only';
+            updateActiveButtonUI();
+        });
+
+        btnAct2.addEventListener('click', () => {
+            currentMode = currentMode === 'act2_only' ? 'idle' : 'act2_only';
+            updateActiveButtonUI();
+        });
+
+        btnBoth.addEventListener('click', () => {
+            currentMode = currentMode === 'both' ? 'idle' : 'both';
+            updateActiveButtonUI();
+        });
+
+        btnReset.addEventListener('click', () => {
+            currentMode = 'idle';
+            updateActiveButtonUI();
+            theta1 = 35;
+            theta2 = 45;
+            tracePath = [];
+            time = 0;
+            updateUiIndicators();
+        });
+
+        btnToggleGrid.addEventListener('click', () => {
+            showGrid = !showGrid;
+            btnToggleGrid.classList.toggle('text-white', showGrid);
+        });
+
+        btnClearTrace.addEventListener('click', () => {
+            tracePath = [];
+        });
+
+        // 手动滑块输入响应
+        sliderM1.addEventListener('input', (e) => {
+            currentMode = 'idle';
+            updateActiveButtonUI();
+            theta1 = parseFloat(e.target.value);
+            updateUiIndicators();
+        });
+
+        sliderM2.addEventListener('input', (e) => {
+            currentMode = 'idle';
+            updateActiveButtonUI();
+            theta2 = parseFloat(e.target.value);
+            updateUiIndicators();
+        });
+
+        sliderSpeed.addEventListener('input', (e) => {
+            speedModifier = parseFloat(e.target.value);
+            sliderSpeedLbl.textContent = `${speedModifier.toFixed(1)}x`;
+        });
+
+        // 绘制辅助背景网格
+        function drawGridLines(w, h) {
+            ctx.strokeStyle = colors.grid;
+            ctx.lineWidth = 1;
+            const step = 40;
+            for (let x = 0; x < w; x += step) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, h);
+                ctx.stroke();
+            }
+            for (let y = 0; y < h; y += step) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(w, y);
+                ctx.stroke();
+            }
+        }
+
+        // 绘制金属质感带轮组件
+        function drawPulley(cx, cy, radius, rotationRad, color, style = 'spokes') {
+            ctx.save();
+            ctx.translate(cx, cy);
+            ctx.rotate(rotationRad);
+
+            // 外部金属槽轮廓
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.arc(0, 0, radius, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // 内缘细线圈
+            ctx.strokeStyle = '#020617';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.arc(0, 0, radius - 3, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // 主中心钢制转轴核心
+            ctx.fillStyle = '#475569';
+            ctx.beginPath();
+            ctx.arc(0, 0, 5, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 根据类型绘制带轮辐条
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 2;
+            if (style === 'spokes') {
+                const total = 6;
+                for (let i = 0; i < total; i++) {
+                    const angle = (i * Math.PI * 2) / total;
+                    ctx.beginPath();
+                    ctx.moveTo(0, 0);
+                    ctx.lineTo(Math.cos(angle) * (radius - 3), Math.sin(angle) * (radius - 3));
+                    ctx.stroke();
+                }
+            } else {
+                ctx.fillStyle = color;
+                for (let i = 0; i < 4; i++) {
+                    const angle = (i * Math.PI) / 2;
+                    ctx.beginPath();
+                    ctx.arc(Math.cos(angle) * (radius * 0.55), Math.sin(angle) * (radius * 0.55), 3, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+            ctx.restore();
+        }
+
+        // 绘制闭合传动皮带，带移动齿纹指示带速
+        function drawBeltTransmission(p1x, p1y, r1, p2x, p2y, r2, offsetPhase, color) {
+            const dx = p2x - p1x;
+            const dy = p2y - p1y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+
+            if (dist < Math.abs(r1 - r2)) return; 
+
+            const angleCenterLine = Math.atan2(dy, dx);
+            const angleOffset = Math.acos((r1 - r2) / dist);
+
+            // 切线交点角度计算
+            const t1_angle1 = angleCenterLine + angleOffset;
+            const t1_angle2 = angleCenterLine - angleOffset;
+
+            // 切线端点坐标
+            const p1_t1x = p1x + r1 * Math.cos(t1_angle1);
+            const p1_t1y = p1y + r1 * Math.sin(t1_angle1);
+            const p2_t1x = p2x + r2 * Math.cos(t1_angle1);
+            const p2_t1y = p2y + r2 * Math.sin(t1_angle1);
+
+            const p1_t2x = p1x + r1 * Math.cos(t1_angle2);
+            const p1_t2y = p1y + r1 * Math.sin(t1_angle2);
+            const p2_t2x = p2x + r2 * Math.cos(t1_angle2);
+            const p2_t2y = p2y + r2 * Math.sin(t1_angle2);
+
+            ctx.save();
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 4;
+            
+            // 实体主厚皮带轮廓
+            ctx.beginPath();
+            ctx.moveTo(p1_t1x, p1_t1y);
+            ctx.lineTo(p2_t1x, p2_t1y);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(p1_t2x, p1_t2y);
+            ctx.lineTo(p2_t2x, p2_t2y);
+            ctx.stroke();
+
+            // 绘制滑动的齿痕亮线表示动能输送速度
+            ctx.strokeStyle = '#f8fafc';
+            ctx.lineWidth = 1.5;
+            ctx.setLineDash([5, 12]);
+            ctx.lineDashOffset = offsetPhase;
+
+            ctx.beginPath();
+            ctx.moveTo(p1_t1x, p1_t1y);
+            ctx.lineTo(p2_t1x, p2_t1y);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(p2_t2x, p2_t2y);
+            ctx.lineTo(p1_t2x, p1_t2y);
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
+        // 绘制转轴和关节的角度参考圆弧
+        function drawAngleArc(cx, cy, startAngleRad, endAngleRad, radius, color, labelText) {
+            ctx.save();
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 1.5;
+            ctx.setLineDash([3, 3]);
+            
+            // 水平参考虚线
+            ctx.beginPath();
+            ctx.moveTo(cx, cy);
+            ctx.lineTo(cx + radius * 1.5, cy);
+            ctx.stroke();
+
+            // 角度弧线
+            ctx.setLineDash([]);
+            ctx.beginPath();
+            ctx.arc(cx, cy, radius, startAngleRad < endAngleRad ? startAngleRad : endAngleRad, startAngleRad < endAngleRad ? endAngleRad : startAngleRad);
+            ctx.stroke();
+
+            // 标签定位
+            const midAngle = (startAngleRad + endAngleRad) / 2;
+            const textX = cx + (radius + 15) * Math.cos(midAngle);
+            const textY = cy + (radius + 15) * Math.sin(midAngle);
+            
+            ctx.fillStyle = color;
+            ctx.font = 'bold 11px monospace';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(labelText, textX, textY);
+            ctx.restore();
+        }
+
+        // 物理核心渲染主循环
+        function draw() {
+            const w = canvas.width / (window.devicePixelRatio || 1);
+            const h = canvas.height / (window.devicePixelRatio || 1);
+            ctx.clearRect(0, 0, w, h);
+
+            if (showGrid) {
+                drawGridLines(w, h);
+            }
+
+            // 【教科书核心位置布局】：基座与关节 1 (肩关节) 重合
+            const originX = w * 0.45;
+            const originY = h * 0.42;
+
+            // 驱动器 2 放置在基座侧下方，平行于驱动器 1 的共轴端
+            const act2_X = originX - 110;
+            const act2_Y = originY + 120;
+
+            // 随动计算模式
+            const speedScale = 0.015 * speedModifier;
+            time += speedScale;
+
+            if (currentMode === 'act1_only') {
+                // 仅主动件 1 驱动，由于绝对运动学原理：
+                // q1 = theta1, 驱动器 2 的 θs2 保持不变，因此连杆 2 也跟随联动，
+                // 皮带 1 锁止，由于连杆1旋转，共轴带轮发生反向差值移动
+                theta1 = 45 * Math.sin(time * 2);
+                updateUiIndicators();
+                beltPhase2 += (speedScale * 45); 
+            } else if (currentMode === 'act2_only') {
+                // 仅驱动器 2 运行：驱动器 1 的 q1 静止，仅 θs2 发生绝对变化
+                theta2 = 60 + 50 * Math.sin(time * 2.2);
+                updateUiIndicators();
+                beltPhase1 -= (speedScale * 75);
+                beltPhase2 -= (speedScale * 75);
+            } else if (currentMode === 'both') {
+                // 联合模式：同时模拟运动学轨迹
+                theta1 = 40 * Math.sin(time * 1.5);
+                theta2 = 45 + 35 * Math.cos(time * 2.0);
+                updateUiIndicators();
+                beltPhase1 += (speedScale * 45);
+                beltPhase2 -= (speedScale * 35);
+            }
+
+            const q1_rad = rad(q1);
+            const q2_rad = rad(q2);
+
+            // 连杆端点运动学计算 (FK)
+            const joint2X = originX + L1 * Math.cos(q1_rad);
+            const joint2Y = originY + L1 * Math.sin(q1_rad);
+
+            const eeX = joint2X + L2 * Math.cos(q2_rad);
+            const eeY = joint2Y + L2 * Math.sin(q2_rad);
+
+            // 输出遥测末端坐标
+            valEECoords.textContent = `X: ${(eeX - originX).toFixed(0)}, Y: ${(-(eeY - originY)).toFixed(0)}`;
+
+            // 添加轨迹记录
+            tracePath.push({x: eeX, y: eeY});
+            if (tracePath.length > maxTraceLength) tracePath.shift();
+
+            // 绘制淡紫色美观尾迹
+            if (tracePath.length > 1) {
+                ctx.save();
+                ctx.strokeStyle = 'rgba(168, 85, 247, 0.4)';
+                ctx.lineWidth = 2.5;
+                ctx.shadowColor = '#a855f7';
+                ctx.shadowBlur = 5;
+                ctx.beginPath();
+                ctx.moveTo(tracePath[0].x, tracePath[0].y);
+                for (let i = 1; i < tracePath.length; i++) {
+                    ctx.lineTo(tracePath[i].x, tracePath[i].y);
+                }
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            // 1. 绘制基座承载支架 (完美还原图 8.8 的铸铁固定箱体模型)
+            ctx.save();
+            ctx.fillStyle = '#1e293b';
+            ctx.strokeStyle = '#475569';
+            ctx.lineWidth = 3.5;
+            ctx.beginPath();
+            ctx.moveTo(originX - 150, originY + 160);
+            ctx.lineTo(originX - 40, originY);
+            ctx.lineTo(originX + 40, originY);
+            ctx.lineTo(originX + 80, originY + 160);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // 基座锚固钢轨底座
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(originX - 180, originY + 150, 310, 16);
+            ctx.strokeRect(originX - 180, originY + 150, 310, 16);
+            ctx.restore();
+
+            // 2. 绘制基座驱动器外框
+            ctx.save();
+            ctx.fillStyle = '#334155';
+            ctx.strokeStyle = '#475569';
+            ctx.lineWidth = 2.5;
+            
+            // 驱动器 2 端机体
+            ctx.beginPath();
+            ctx.arc(act2_X, act2_Y, 26, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+            ctx.restore();
+
+            // 驱动器标签标示
+            ctx.font = 'bold 10px monospace';
+            ctx.fillStyle = colors.dimText;
+            ctx.fillText("驱动器 1 (同轴直接驱动)", originX + 50, originY + 10);
+            ctx.fillText("驱动器 2", act2_X - 25, act2_Y + 40);
+
+            // 3. 绘制第一级皮带 (从侧边驱动器 2 到共轴关节 1)
+            drawBeltTransmission(act2_X, act2_Y, rDrive, originX, originY, rCoaxial, beltPhase1, colors.belt1);
+
+            // 4. 绘制第二级皮带 (沿连杆 1 直达肘部关节 2)
+            drawBeltTransmission(originX, originY, rCoaxial, joint2X, joint2Y, rElbow, beltPhase2, colors.belt2);
+
+            // 5. 绘制连杆 1 (蓝色轻量化空心双板架构)
+            ctx.save();
+            ctx.strokeStyle = '#020617';
+            ctx.lineWidth = 20;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(originX, originY);
+            ctx.lineTo(joint2X, joint2Y);
+            ctx.stroke();
+
+            ctx.strokeStyle = colors.link1;
+            ctx.lineWidth = 11;
+            ctx.beginPath();
+            ctx.moveTo(originX, originY);
+            ctx.lineTo(joint2X, joint2Y);
+            ctx.stroke();
+            ctx.restore();
+
+            // 6. 绘制连杆 2 (橙色空腔合金臂)
+            ctx.save();
+            ctx.strokeStyle = '#020617';
+            ctx.lineWidth = 13;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(joint2X, joint2Y);
+            ctx.lineTo(eeX, eeY);
+            ctx.stroke();
+
+            ctx.strokeStyle = colors.link2;
+            ctx.lineWidth = 6;
+            ctx.beginPath();
+            ctx.moveTo(joint2X, joint2Y);
+            ctx.lineTo(eeX, eeY);
+            ctx.stroke();
+            ctx.restore();
+
+            // 7. 绘制各处精密的皮带轮与轴承套
+            // 驱动器 2 的输入带轮
+            drawPulley(act2_X, act2_Y, rDrive, rad(theta2), colors.belt1, 'spots');
+
+            // 关节 1 (肩关节)：
+            // 内部：驱动器 1 直连的主轴带轮 (与连杆 1 同步，旋转角度为 q1)
+            drawPulley(originX, originY, rCoaxial - 7, q1_rad, colors.link1, 'spokes');
+            // 外部：空套双联大带轮 (接收皮带 1 并输出给皮带 2，旋转角度为 q2)
+            drawPulley(originX, originY, rCoaxial, q2_rad, colors.belt1, 'spots');
+
+            // 关节 2 (肘部)：
+            // 肘部带轮 (紧固在连杆 2 的主轴端，旋转角度为绝对角度 q2)
+            drawPulley(joint2X, joint2Y, rElbow, q2_rad, colors.link2, 'spokes');
+
+            // 末端执行器探针红点
+            ctx.save();
+            ctx.fillStyle = '#ef4444';
+            ctx.beginPath();
+            ctx.arc(eeX, eeY, 5.5, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(eeX, eeY, 9, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.restore();
+
+            // 在画布关节旁展示角度代号
+            ctx.save();
+            ctx.fillStyle = colors.text;
+            ctx.font = 'bold 11px sans-serif';
+            ctx.fillText(`连杆 1 (q₁: ${Math.round(q1)}°)`, originX - 50, originY - 45);
+            ctx.fillText(`连杆 2 (q₂: ${Math.round(q2)}°)`, joint2X - 50, joint2Y - 30);
+            ctx.restore();
+
+            // 绘制运动学夹角可视化虚线圆弧
+            drawAngleArc(originX, originY, 0, q1_rad, 40, colors.link1, `q₁`);
+            drawAngleArc(joint2X, joint2Y, 0, q2_rad, 30, colors.link2, `q₂`);
+
+            requestAnimationFrame(draw);
+        }
+
+        // 窗口加载时自动运行仿真
+        window.onload = function() {
+            updateUiIndicators();
+            draw();
+        };
+    </script>
+</body>
+</html>

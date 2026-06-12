@@ -1,0 +1,230 @@
+\chapter{双编码器系统工作原理}
+\label{ch:dual_encoder}
+
+\section{双编码器的真实价值}
+
+大多数控制工程师对双编码器的理解停留在："一个电机端测速、一个输出端定位"。\textbf{这是完全错误的认知。}
+
+\begin{keyinsight}{双编码器的真正价值}
+双编码器的核心价值是：\\
+\textbf{通过两端角度差计算关节的扭转形变，从而间接得到关节力矩。}\\
+它不是为了提高定位精度，而是为了\textbf{辅助力矩观测}。
+\end{keyinsight}
+
+\section{双编码器配置方案}
+
+\subsection{电机端编码器}
+
+\begin{itemize}
+  \item \textbf{位置}：安装在电机轴（减速器输入侧）
+  \item \textbf{功能}：
+  \begin{itemize}
+    \item 电机转子位置$\theta_m$——用于\textbf{FOC矢量控制}的Park/Clarke变换
+    \item 电机转速$\omega_m$——用于速度环控制
+    \item 记录磁极位置——用于\textbf{电机换向}
+  \end{itemize}
+  \item \textbf{典型规格}：增量式/绝对值，分辨率$2^{14}$--$2^{19}$脉冲/转
+  \item \textbf{核心要求}：高更新率（通常$>10$ kHz）、低延迟
+\end{itemize}
+
+\subsection{输出端编码器}
+
+\begin{itemize}
+  \item \textbf{位置}：安装在关节输出轴（减速器输出侧）
+  \item \textbf{功能}：
+  \begin{itemize}
+    \item 关节绝对位置$\theta_j$——用于运动学计算和位置控制
+    \item 与电机端角度对比$\Delta\theta = \theta_m/i - \theta_j$——计算\textbf{传动系统形变}
+    \item 关节长期定位精度——补偿减速器的累积误差
+  \end{itemize}
+  \item \textbf{典型规格}：绝对值编码器，分辨率$2^{17}$--$2^{23}$脉冲/转
+  \item \textbf{核心要求}：低温漂、抗振动
+\end{itemize}
+
+\begin{figure}[H]
+\centering
+\begin{tcolorbox}[colback=lightgray]
+\centering
+\textbf{双编码器系统信号流}\\
+\vspace{5pt}
+$\theta_m$（电机端）$\underset{\div i}{\longrightarrow}$ $\theta_m/i$（电机端折算到输出）\\
+$\theta_j$（输出端）\\
+$\Delta\theta = \theta_m/i - \theta_j$（扭转角）$\underset{\times K}{\longrightarrow}$ 关节力矩估计
+\end{tcolorbox}
+\caption{双编码器力矩估计原理}
+\label{fig:dual_encoder_principle}
+\end{figure}
+
+\section{通过双编码器计算关节力矩}
+
+\subsection{基本原理}
+
+减速器和关节结构可以简化为一个\textbf{弹性体}（扭转弹簧）：
+
+\begin{equation}
+T_{\text{joint}} = K_{\text{stiffness}} \times (\theta_m/i - \theta_j) = K_{\text{stiffness}} \times \Delta\theta
+\end{equation}
+
+其中$K_{\text{stiffness}}$是关节传动系统（减速器+结构件）的等效扭转刚度。
+
+\begin{engineeringbox}{双编码器力矩估计的精度}
+力矩估计精度取决于：\\
+\begin{itemize}
+  \item 编码器分辨率（决定$\Delta\theta$的测量精度）
+  \item 刚度$K_{\text{stiffness}}$的准确性和线性度
+  \item 温度对刚度的影响（柔性材料$K$随温度变化）
+\end{itemize}
+在良好的校准下，双编码器力矩估计精度可达\textbf{2--5\%额定力矩}，\\接近低精度力矩传感器的水平。
+\end{engineeringbox}
+
+\subsection{动力学滤波}
+
+直接差分得到的$\Delta\theta$含有噪声，需要滤波：
+
+\begin{equation}
+\hat{T}_{\text{joint}}(s) = \frac{K_{\text{stiffness}} \cdot \Delta\theta(s)}{\tau s + 1}
+\end{equation}
+
+其中$\tau$是低通滤波时间常数。滤波会引入相位滞后，在动态任务中需要补偿。
+
+\section{双编码器如何补偿减速器误差}
+
+\subsection{减速器的主要可补偿误差}
+
+双编码器可以补偿的误差类型：
+
+\begin{enumerate}
+  \item \textbf{位置依赖的传动误差（PDE）}：
+  \begin{itemize}
+    \item 减速器内部齿轮啮合不均匀导致的位置误差
+    \item 可以通过$\Delta\theta(\theta_j)$映射表补偿
+  \end{itemize}
+  \item \textbf{滞后}：
+  \begin{itemize}
+    \item 与力矩方向相关的传动误差
+    \item 双编码器可以检测到"电机转了但输出没动"的背隙区域
+  \end{itemize}
+  \item \textbf{温度漂移}：
+  \begin{itemize}
+    \item 热膨胀导致减速器齿隙变化
+    \item 双编码器实时检测，不需要温度模型
+  \end{itemize}
+\end{enumerate}
+
+\subsection{双编码器不能补偿的误差}
+
+\begin{itemize}
+  \item \textbf{摩擦}：摩擦是力矩损失，不是位置偏差，双编码器检测不到
+  \item \textbf{高频力矩脉动}：高于编码器采样率的脉动，无法被差分检测
+  \item \textbf{结构共振}：$\Delta\theta$检测的是静态/准静态形变，不是动态振动
+\end{itemize}
+
+\section{半直驱关节不需要力矩传感器的原理}
+
+这是本书\textbf{另一个核心问题}的答案：
+
+半直驱关节（$i \approx 6\text{--}15$）之所以\textbf{可以不用力矩传感器}，原因有二：
+
+\subsection{原因一：电流力矩观测可用}
+
+如第4章所述，低减速比下电流力矩观测精度5--10\%，满足力控需求。不需要额外的力矩传感器。
+
+\subsection{原因二：双编码器提供交叉验证}
+
+\begin{itemize}
+  \item 通过电流估算的力矩 $T_{\text{current}} = K_t \cdot i_q \cdot i$
+  \item 通过双编码器估算的力矩 $T_{\text{dual}} = K_{\text{stiffness}} \cdot \Delta\theta$
+  \item 两个独立估计可以互相验证和融合
+  \item 当两者偏差超出阈值时，可触发故障检测
+\end{itemize}
+
+\begin{equation}
+T_{\text{final}} = \alpha \cdot T_{\text{current}} + (1-\alpha) \cdot T_{\text{dual}}
+\end{equation}
+
+其中$\alpha$是融合权重，根据工况动态调整。
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lccc}
+\toprule
+\textbf{方案} & \textbf{电流力控} & \textbf{双编码器} & \textbf{力矩传感器} \\
+\midrule
+宇树H1 & ✓ 低减速比可行 & ✓ 辅助 & ✗ 不需要 \\
+特斯拉Optimus & ✗ 高减速比失效 & ✓ 必须 & ✓ 必须 \\
+优必选Walker & ✗ 超高减速比 & ✓ 必须 & ✓ 必须 \\
+传统工业臂 & ✗ & ✗ 只有电机端编码器 & ✓ 末端 \\
+\bottomrule
+\end{tabular}
+\caption{主流关节方案传感器配置}
+\label{tab:sensor_config}
+\end{table}
+
+\section{双编码器的选型注意事项}
+
+\subsection{分辨率匹配}
+
+\begin{equation}
+\Delta\theta_{\text{min}} = \frac{T_{\text{resolution}}}{K_{\text{stiffness}}}
+\end{equation}
+
+如果需要的力矩分辨率是$T_{\text{resolution}}$，则编码器需要能检测到的最小$\Delta\theta$是上式。
+
+\textbf{例子}：如果$K_{\text{stiffness}} = 5000$ Nm/rad，需要0.1 Nm的力矩分辨率：
+\begin{equation}
+\Delta\theta_{\text{min}} = \frac{0.1}{5000} = 2 \times 10^{-5} \text{ rad} \approx 0.0011^\circ
+\end{equation}
+
+需要输出端编码器分辨率至少为$2^{19}$脉冲/转才能可靠检测。
+
+\subsection{更新率匹配}
+
+\begin{itemize}
+  \item 电机端编码器更新率必须匹配\textbf{电流环频率}（通常10--40 kHz）
+  \item 输出端编码器更新率匹配\textbf{力控频率}（通常1--5 kHz）
+  \item 两个编码器的采样\textbf{必须同步}——否则$\Delta\theta$的噪声被采样时间差淹没
+\end{itemize}
+
+\begin{cautionbox}{编码器不同步的陷阱}
+如果电机端和输出端编码器不是同时采样，\\
+即使实际的$\Delta\theta$为0，由于采样时间差和运动速度，\\
+计算出的$\Delta\theta$也会非零：$\Delta\theta_{\text{false}} = \omega \times \Delta t_{\text{sampling}}$\\
+这个\textbf{假的扭转角}会直接变成力矩估计的\textbf{虚假信号}。
+\end{cautionbox}
+
+\section{三大机器人路线的对比总结}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{p{2.5cm}p{3cm}p{3cm}p{3cm}}
+\toprule
+\textbf{特性} & \textbf{宇树路线} & \textbf{特斯拉路线} & \textbf{传统路线} \\
+\midrule
+减速比 & 低（6--15） & 高（$\approx$100） & 高（50--160） \\
+电机端编码器 & 有 & 有 & 有 \\
+输出端编码器 & 有 & 有 & \textbf{无} \\
+力矩传感器 & \textbf{无} & \textbf{有}（关节端） & 有（腕部/末端） \\
+力控实现 & 电流+双编码器 & 力矩传感器 & 力矩传感器 \\
+力控精度 & 中（5--10\%） & 高（$<1\%$） & 高 \\
+成本 & 低 & 高 & 高 \\
+\bottomrule
+\end{tabular}
+\caption{三大机器人路线传感器与力控方案}
+\label{tab:three_approaches}
+\end{table}
+
+\section*{本章小结}
+\addcontentsline{toc}{section}{本章小结}
+
+\begin{summarybox}{}
+\begin{enumerate}
+  \item 双编码器的核心价值是\textbf{通过$\Delta\theta$计算关节力矩}，不是提高定位精度
+  \item 电机端编码器$\rightarrow$FOC换向，输出端编码器$\rightarrow$关节位置+力矩估计
+  \item 半直驱关节（低减速比）\textbf{可以不用力矩传感器}——电流观测+双编码器足够
+  \item 高减速比关节\textbf{必须用力矩传感器}——电流观测已失效，双编码器不够准
+  \item 双编码器力矩估计精度取决于：分辨率、刚度标定、采样同步
+  \item 三条技术路线的最核心差异在于：\textbf{力控信息靠什么获取}
+\end{enumerate}
+\end{summarybox}
+
+\newpage

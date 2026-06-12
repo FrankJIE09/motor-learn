@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>关节模组专题 - 电机与传动系统底层原理</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  background: #0a0e17;
+  color: #e0e6f0;
+  line-height: 1.7;
+}
+.hero {
+  background: linear-gradient(135deg, #0f1a23 0%, #1a2a3a 50%, #0d1520 100%);
+  padding: 80px 20px 60px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+.hero::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle at 50% 50%, rgba(100,200,255,0.06) 0%, transparent 50%);
+  animation: pulse 8s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 0.3; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(1.1); }
+}
+.hero h1 {
+  font-size: 2.8em;
+  font-weight: 800;
+  background: linear-gradient(135deg, #60c0ff, #00c8ff);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  position: relative;
+  letter-spacing: 2px;
+  margin-bottom: 16px;
+}
+.hero p {
+  font-size: 1.15em;
+  color: #80a0b8;
+  max-width: 700px;
+  margin: 0 auto;
+  position: relative;
+  line-height: 1.8;
+}
+.system-map {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 40px 20px;
+}
+.section-title {
+  text-align: center;
+  font-size: 1.6em;
+  font-weight: 700;
+  margin-bottom: 12px;
+  color: #90b8d0;
+}
+.section-subtitle {
+  text-align: center;
+  color: #5a7a8a;
+  margin-bottom: 40px;
+  font-size: 1em;
+}
+.module-grid {
+  display: grid;
+  gap: 24px;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+}
+.module-card {
+  background: linear-gradient(145deg, #121e2a, #182836);
+  border-radius: 16px;
+  border: 1px solid #1e3040;
+  overflow: hidden;
+  transition: transform 0.3s, box-shadow 0.3s;
+}
+.module-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px rgba(0,150,255,0.10);
+  border-color: #2a4a62;
+}
+.model-viewer {
+  width: 100%;
+  height: 280px;
+  background: #0a1018;
+}
+.model-viewer iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+.card-content {
+  padding: 24px;
+}
+.module-badge {
+  display: inline-block;
+  padding: 3px 12px;
+  border-radius: 20px;
+  font-size: 0.78em;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+.badge-motor { background: rgba(0,180,255,0.15); color: #60c8ff; }
+.badge-encoder { background: rgba(200,100,255,0.15); color: #c080ff; }
+.badge-force { background: rgba(255,80,80,0.15); color: #ff7070; }
+.badge-control { background: rgba(0,220,120,0.15); color: #40e890; }
+.badge-dual { background: rgba(255,180,0,0.15); color: #ffc040; }
+.badge-system { background: rgba(255,140,0,0.15); color: #ffa040; }
+.card-content h3 {
+  font-size: 1.25em;
+  font-weight: 700;
+  margin-bottom: 8px;
+  color: #a0c8e0;
+}
+.card-content p {
+  font-size: 0.92em;
+  color: #6a8a9a;
+  margin-bottom: 12px;
+}
+.key-formula {
+  background: rgba(0,120,200,0.08);
+  border-left: 3px solid #0088cc;
+  padding: 10px 16px;
+  border-radius: 0 8px 8px 0;
+  margin: 10px 0;
+  font-family: 'Courier New', monospace;
+  font-size: 0.9em;
+  color: #70b8e8;
+}
+.stats-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+.stat-item {
+  background: rgba(255,255,255,0.04);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 0.82em;
+  color: #5a7a8a;
+}
+.stat-item strong { color: #90b0c8; }
+.flow-section {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 50px 20px;
+}
+.flow-title {
+  text-align: center;
+  font-size: 1.5em;
+  font-weight: 700;
+  margin-bottom: 30px;
+  color: #80b0d0;
+}
+.flow-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.flow-node {
+  background: linear-gradient(145deg, #142230, #1c2e3e);
+  border: 1px solid #2a4055;
+  border-radius: 12px;
+  padding: 14px 20px;
+  text-align: center;
+  min-width: 100px;
+  transition: all 0.3s;
+}
+.flow-node:hover {
+  border-color: #4080aa;
+  transform: translateY(-2px);
+}
+.flow-node .icon { font-size: 1.6em; margin-bottom: 4px; }
+.flow-node .label { font-size: 0.82em; color: #7a9aaa; font-weight: 600; }
+.flow-node .sub { font-size: 0.72em; color: #4a6a7a; margin-top: 2px; }
+.flow-arrow {
+  font-size: 1.4em;
+  color: #2a4a6a;
+  flex-shrink: 0;
+}
+.case-section {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 50px 20px;
+}
+.case-grid {
+  display: grid;
+  gap: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+}
+.case-card {
+  background: linear-gradient(145deg, #121e2a, #182836);
+  border: 1px solid #1e3040;
+  border-radius: 14px;
+  padding: 24px;
+  transition: border-color 0.3s;
+}
+.case-card:hover { border-color: #2a4a62; }
+.case-card h4 {
+  font-size: 1.1em;
+  margin-bottom: 8px;
+  color: #90b8d0;
+}
+.case-card .spec {
+  font-size: 0.85em;
+  color: #5a7a8a;
+  margin-bottom: 4px;
+}
+.case-card .spec strong { color: #80a0b8; }
+.arch-section {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 50px 20px;
+}
+.arch-row {
+  display: grid;
+  gap: 24px;
+  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+}
+.arch-card {
+  background: linear-gradient(145deg, #121e2a, #182836);
+  border: 1px solid #1e3040;
+  border-radius: 14px;
+  padding: 24px;
+  position: relative;
+  overflow: hidden;
+}
+.arch-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 100%;
+  border-radius: 4px 0 0 4px;
+}
+.arch-card.h1::before { background: #00c853; }
+.arch-card.optimus::before { background: #448aff; }
+.arch-card.walker::before { background: #ff6d00; }
+.arch-card h4 {
+  font-size: 1.15em;
+  margin-bottom: 12px;
+}
+.arch-card.h1 h4 { color: #69f0ae; }
+.arch-card.optimus h4 { color: #82b1ff; }
+.arch-card.walker h4 { color: #ffab40; }
+.arch-card .component {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  font-size: 0.88em;
+  color: #7a9aaa;
+}
+.arch-card .component .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.arch-card .component .dot.green { background: #00c853; }
+.arch-card .component .dot.blue { background: #448aff; }
+.arch-card .component .dot.orange { background: #ff6d00; }
+.arch-card .component .dot.purple { background: #aa66ff; }
+.arch-card .component .dot.cyan { background: #00bcd4; }
+.footer {
+  text-align: center;
+  padding: 40px 20px;
+  color: #3a5a6a;
+  font-size: 0.85em;
+  border-top: 1px solid #121e2a;
+}
+@media (max-width: 768px) {
+  .hero h1 { font-size: 1.8em; }
+  .module-grid { grid-template-columns: 1fr; }
+  .flow-container { gap: 4px; }
+  .flow-node { padding: 10px 14px; min-width: 70px; }
+  .flow-arrow { font-size: 1em; }
+  .model-viewer { height: 220px; }
+}
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <h1>关节模组 · 完整系统架构</h1>
+  <p>从电机到关节输出的完整链路 — FOC 矢量控制 · 弹性变形力矩传感 · 电流/力矩双环融合 · 系统方案对比</p>
+</div>
+
+<div class="system-map">
+  <h2 class="section-title">关节模组核心模块</h2>
+  <p class="section-subtitle">点击/拖拽 3D 模型查看各组件结构</p>
+
+  <div class="module-grid">
+
+    <!-- 模块 1: PMSM 关节电机 -->
+    <div class="module-card">
+      <div class="model-viewer">
+        <iframe src="https://sketchfab.com/models/a9294a35fd4643169619bbda1a921225/embed?autostart=1&internal=1&tracking=0&ui_ar=0&ui_infos=0&ui_snapshots=0&ui_stop=0&ui_theatre=0&ui_watermark=0&ui_hint=2&autospin=0.2" allow="autoplay; fullscreen" allowfullscreen></iframe>
+      </div>
+      <div class="card-content">
+        <span class="module-badge badge-motor">关节电机</span>
+        <h3>SPMSM 无框电机</h3>
+        <p>机器人关节广泛采用 SPMSM 无框电机（无外壳、无轴承），直接嵌入关节壳体。转矩密度 1.5–3.0 Nm/kg，K<sub>t</sub> 温漂 −0.12%/°C (NdFeB 磁钢)。</p>
+        <div class="key-formula">T<sub>e</sub> = 3/2 · (P/2) · λ<sub>PM</sub> · i<sub>q</sub> = K<sub>t</sub> · i<sub>q</sub></div>
+        <div class="stats-row">
+          <span class="stat-item"><strong>K<sub>t</sub></strong> 3–5% 波动</span>
+          <span class="stat-item"><strong>温漂</strong> −6.6% (25→80°C)</span>
+          <span class="stat-item"><strong>转矩脉动</strong> &lt; 1%</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 模块 2: 关节编码器 -->
+    <div class="module-card">
+      <div class="model-viewer">
+        <iframe src="https://sketchfab.com/models/bf200d56df40421ba0ccb38d5e8f732a/embed?autostart=1&internal=1&tracking=0&ui_ar=0&ui_infos=0&ui_snapshots=0&ui_stop=0&ui_theatre=0&ui_watermark=0&ui_hint=2&autospin=0.2" allow="autoplay; fullscreen" allowfullscreen></iframe>
+      </div>
+      <div class="card-content">
+        <span class="module-badge badge-encoder">位置传感</span>
+        <h3>编码器 &amp; 位置采样</h3>
+        <p>电机端编码器 10–40 kHz 采样位置 θ<sub>m</sub>，关节端编码器 1–5 kHz 采样 θ<sub>j</sub>。分辨率需达 214–219 线/转以上。</p>
+        <div class="key-formula">∆θ = θ<sub>m</sub>/i − θ<sub>j</sub> &nbsp; (弹性变形角)</div>
+        <div class="stats-row">
+          <span class="stat-item"><strong>电机编码器</strong> 10–40 kHz</span>
+          <span class="stat-item"><strong>关节编码器</strong> 1–5 kHz</span>
+          <span class="stat-item"><strong>分辨率</strong> 214–219 线/转</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 模块 3: 关节力矩传感 -->
+    <div class="module-card">
+      <div class="model-viewer">
+        <iframe src="https://sketchfab.com/models/66b2ea9eb6e5468d91d814395036a537/embed?autostart=1&internal=1&tracking=0&ui_ar=0&ui_infos=0&ui_snapshots=0&ui_stop=0&ui_theatre=0&ui_watermark=0&ui_hint=2&autospin=0.2" allow="autoplay; fullscreen" allowfullscreen></iframe>
+      </div>
+      <div class="card-content">
+        <span class="module-badge badge-force">力矩传感</span>
+        <h3>弹性变形力矩测量</h3>
+        <p>通过测量弹性体两端的相对角位移 ∆θ 推算关节力矩。刚度为 K<sub>stiffness</sub>，力矩分辨率由 ∆θ<sub>min</sub> 决定。</p>
+        <div class="key-formula">T<sub>joint</sub> = K<sub>stiffness</sub> × ∆θ &nbsp; ∆θ<sub>min</sub> = T<sub>resolution</sub> / K<sub>stiffness</sub></div>
+        <div class="stats-row">
+          <span class="stat-item"><strong>K<sub>stiffness</sub></strong> 10<sup>3</sup>–10<sup>4</sup> Nm/rad</span>
+          <span class="stat-item"><strong>分辨率</strong> 0.0011° (K=5000)</span>
+          <span class="stat-item"><strong>精度</strong> 5–10%</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 模块 4: FOC + 电流环 -->
+    <div class="module-card">
+      <div class="model-viewer">
+        <iframe src="https://sketchfab.com/models/bd5e4fb4da604041962d4f4963027fde/embed?autostart=1&internal=1&tracking=0&ui_ar=0&ui_infos=0&ui_snapshots=0&ui_stop=0&ui_theatre=0&ui_watermark=0&ui_hint=2&autospin=0.2" allow="autoplay; fullscreen" allowfullscreen></iframe>
+      </div>
+      <div class="card-content">
+        <span class="module-badge badge-control">FOC 控制</span>
+        <h3>磁场定向控制 + 电流采样</h3>
+        <p>Clarke/Park 变换将三相电流解耦为 d-q 轴。i<sub>q</sub> 直接控制电磁转矩，电流环带宽 &gt; 10 kHz。SPMSM 采用 i<sub>d</sub>=0 策略。</p>
+        <div class="key-formula">T<sub>expected</sub> = K<sub>t</sub> · i<sub>q</sub> &nbsp;→&nbsp; T<sub>out</sub> = K<sub>t</sub> · i<sub>q</sub> · i · η</div>
+        <div class="stats-row">
+          <span class="stat-item"><strong>电流环</strong> &gt; 10 kHz</span>
+          <span class="stat-item"><strong>PWM</strong> 40–80 kHz</span>
+          <span class="stat-item"><strong>i<sub>q</sub></strong> 转矩电流</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 模块 5: 电流/力矩双环 -->
+    <div class="module-card">
+      <div class="model-viewer">
+        <iframe src="https://sketchfab.com/models/62795d3a16d746828f94be53b828e1c4/embed?autostart=1&internal=1&tracking=0&ui_ar=0&ui_infos=0&ui_snapshots=0&ui_stop=0&ui_theatre=0&ui_watermark=0&ui_hint=2&autospin=0.2" allow="autoplay; fullscreen" allowfullscreen></iframe>
+      </div>
+      <div class="card-content">
+        <span class="module-badge badge-dual">双环融合</span>
+        <h3>电流 + 力矩双环控制</h3>
+        <p>电流环 T<sub>current</sub> = K<sub>t</sub> · i<sub>q</sub> · i 提供高频低延迟响应；力矩环 T<sub>dual</sub> = K<sub>stiffness</sub> · ∆θ 提供精确直流校准。两者加权融合。</p>
+        <div class="key-formula">T<sub>final</sub> = α · T<sub>current</sub> + (1 − α) · T<sub>dual</sub></div>
+        <div class="stats-row">
+          <span class="stat-item"><strong>α 高</strong> 响应快，噪声低</span>
+          <span class="stat-item"><strong>α 低</strong> 精度高，延迟大</span>
+          <span class="stat-item"><strong>H1</strong> 5–10% 精度</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 模块 6: DOB 干扰观测 -->
+    <div class="module-card">
+      <div class="model-viewer">
+        <iframe src="https://sketchfab.com/models/7159f69f4df2467ea9d22a3051740181/embed?autostart=1&internal=1&tracking=0&ui_ar=0&ui_infos=0&ui_snapshots=0&ui_stop=0&ui_theatre=0&ui_watermark=0&ui_hint=2&autospin=0.2" allow="autoplay; fullscreen" allowfullscreen></iframe>
+      </div>
+      <div class="card-content">
+        <span class="module-badge badge-control">DOB 观测</span>
+        <h3>干扰观测器 (DOB / ADRC)</h3>
+        <p>基于模型估算外部干扰和未建模动态：力矩 = 电磁转矩 − 惯量加速 − 摩擦 − 已知干扰。DOB 可补偿 15–30% 的干扰量。</p>
+        <div class="key-formula">T̂<sub>dist</sub> = K<sub>t</sub> · i<sub>q</sub> · i − J · ˙ω − T̂<sub>friction</sub></div>
+        <div class="stats-row">
+          <span class="stat-item"><strong>DOB</strong> 15–30% 补偿</span>
+          <span class="stat-item"><strong>低减速</strong> 10–20% 提升</span>
+          <span class="stat-item"><strong>摩擦</strong> 10–20% T<sub>rated</sub></span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="flow-section">
+  <h2 class="flow-title">🔁 关节模组信号与控制流</h2>
+  <div class="flow-container">
+    <div class="flow-node"><div class="icon">🎮</div><div class="label">期望 T<sub>ref</sub></div><div class="sub">WBC 下发的力矩指令</div></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node"><div class="icon">⚡</div><div class="label">电流环</div><div class="sub">i<sub>q</sub> = T<sub>ref</sub> / K<sub>t</sub></div></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node"><div class="icon">🔄</div><div class="label">FOC</div><div class="sub">Park/Clarke → PWM</div></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node"><div class="icon">🧲</div><div class="label">电磁转矩</div><div class="sub">T<sub>e</sub> = K<sub>t</sub>·i<sub>q</sub></div></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node"><div class="icon">⚙️</div><div class="label">减速器</div><div class="sub">×i, ×η, +摩擦</div></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node"><div class="icon">📐</div><div class="label">弹性体</div><div class="sub">∆θ → T<sub>dual</sub></div></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node"><div class="icon">🤖</div><div class="label">关节输出</div><div class="sub">T<sub>final</sub> 到连杆</div></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node"><div class="icon">🔁</div><div class="label">DOB</div><div class="sub">干扰估算补偿</div></div>
+  </div>
+</div>
+
+<div class="arch-section">
+  <h2 class="section-title">三大机器人关节架构对比</h2>
+  <p class="section-subtitle">基于《电机与传动系统底层原理》第7章</p>
+  <div class="arch-row">
+    <div class="arch-card h1">
+      <h4>H1 — 准直驱关节</h4>
+      <div class="component"><span class="dot green"></span> SPMSM 无框电机 + QDD 行星减速 (i≈10)</div>
+      <div class="component"><span class="dot green"></span> 电机编码器 (214–219 线) + 关节编码器</div>
+      <div class="component"><span class="dot green"></span> 弹性体 ∆θ 力矩传感</div>
+      <div class="component"><span class="dot green"></span> 电流 + 力矩双环融合</div>
+      <div class="component"><span class="dot green"></span> 力控精度 5–10%，反向驱动性好</div>
+      <div class="component"><span class="dot green"></span> WBC 带宽 &gt; 500 Hz</div>
+    </div>
+    <div class="arch-card optimus">
+      <h4>Optimus — 高减速关节</h4>
+      <div class="component"><span class="dot blue"></span> SPMSM + 多级传动 (i≈100)</div>
+      <div class="component"><span class="dot blue"></span> 高分辨率编码器 (&lt; 0.01° 分辨率)</div>
+      <div class="component"><span class="dot blue"></span> 关节力矩传感器 (直接测量)</div>
+      <div class="component"><span class="dot blue"></span> 电流环 + 力矩传感器闭环</div>
+      <div class="component"><span class="dot blue"></span> 力控精度 &lt; 1%，高刚度</div>
+      <div class="component"><span class="dot blue"></span> K<sub>stiffness</sub> &gt; 10<sup>4</sup> Nm/rad</div>
+    </div>
+    <div class="arch-card walker">
+      <h4>Walker — 谐波减速关节</h4>
+      <div class="component"><span class="dot orange"></span> SPMSM + 谐波减速器 (i≈50–160)</div>
+      <div class="component"><span class="dot orange"></span> 电机编码器 + 关节编码器</div>
+      <div class="component"><span class="dot orange"></span> 关节力矩传感器 + 电流混合</div>
+      <div class="component"><span class="dot orange"></span> 电流 + 力矩传感器融合</div>
+      <div class="component"><span class="dot orange"></span> 力控精度 &lt; 1%，零背隙</div>
+      <div class="component"><span class="dot orange"></span> WBC 支持，力传感器要求高</div>
+    </div>
+  </div>
+</div>
+
+<div class="case-section">
+  <h2 class="section-title">关节模组关键对比维度</h2>
+  <div class="case-grid">
+    <div class="case-card">
+      <h4>🔧 系统对比总表</h4>
+      <div class="spec"><strong>减速比</strong> H1 6–15 | Optimus ≈100 | Walker 50–160</div>
+      <div class="spec"><strong>电机类型</strong> 均为 SPMSM</div>
+      <div class="spec"><strong>力控方式</strong> H1 双环融合 | Optimus 力传感器闭环 | Walker 混合</div>
+      <div class="spec"><strong>反向驱动</strong> H1 好 | Optimus 差 | Walker 中</div>
+      <div class="spec"><strong>精度</strong> H1 5–10% | Optimus &lt; 1% | Walker &lt; 1%</div>
+      <div class="spec"><strong>传感器开销</strong> H1 低 | Optimus 高 | Walker 高</div>
+    </div>
+    <div class="case-card">
+      <h4>📐 关键公式总结</h4>
+      <div class="spec"><strong>电磁转矩</strong> T<sub>e</sub> = 3/2 · (P/2) · λ<sub>PM</sub> · i<sub>q</sub></div>
+      <div class="spec"><strong>输出转矩</strong> T<sub>out</sub> = K<sub>t</sub>(T) · i<sub>q</sub> · i · η − T<sub>friction</sub> − T<sub>ripple</sub></div>
+      <div class="spec"><strong>关节力矩</strong> T<sub>joint</sub> = K<sub>stiffness</sub> · ∆θ</div>
+      <div class="spec"><strong>双环融合</strong> T<sub>final</sub> = α · T<sub>current</sub> + (1−α) · T<sub>dual</sub></div>
+      <div class="spec"><strong>DOB 观测</strong> T̂<sub>dist</sub> = K<sub>t</sub> · i<sub>q</sub> · i − J · ˙ω − T̂<sub>friction</sub></div>
+      <div class="spec"><strong>反射惯量</strong> J<sub>reflected</sub> = J<sub>load</sub> / i²</div>
+    </div>
+    <div class="case-card">
+      <h4>🎯 选型建议</h4>
+      <div class="spec"><strong>高动态足式</strong> → QDD 方案 (H1 路线)，反向驱动好</div>
+      <div class="spec"><strong>高精度操作</strong> → 谐波/高减速 + 力矩传感器 (Optimus)</div>
+      <div class="spec"><strong>双足平衡</strong> → 谐波减速 + 混合力控 (Walker)</div>
+      <div class="spec"><strong>低减速优势</strong> 高带宽 WBC，可电流环直接力控</div>
+      <div class="spec"><strong>高减速代价</strong> 需力矩传感器，摩擦/齿槽放大</div>
+    </div>
+  </div>
+</div>
+
+<div class="footer">
+  <p>基于《电机与传动系统底层原理》第4–7章 · 3D 模型来源于 Sketchfab (CC 许可)</p>
+  <p>SPMSM · BLDC · 步进电机 · 谐波减速器 · 机器人手臂 · 异步电机 · 直流电机</p>
+</div>
+
+</body>
+</html>

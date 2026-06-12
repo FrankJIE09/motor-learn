@@ -1,0 +1,185 @@
+\chapter{永磁同步电机内部结构}
+\label{ch:pmsm}
+
+\section{控制工程师需要了解的电机结构}
+
+这一章只讲\textbf{对控制有影响}的结构部分。如果你对电机设计感兴趣，有大量电机设计教材可读。这里我们聚焦于：\textbf{哪些制造误差和结构特征会破坏你的控制算法}。
+
+\begin{figure}[H]
+\centering
+\begin{tcolorbox}[colback=lightgray, colframe=primaryblue]
+\centering
+SPMSM 主要结构（示意图）：\\
+定子铁芯 → 绕组（集中/分布式）→ 气隙 → 永磁体 → 转子铁芯 → 轴系 → 轴承
+\end{tcolorbox}
+\caption{PMSM核心结构（文字示意图）}
+\label{fig:pmsm_structure}
+\end{figure}
+
+\section{定子与绕组——力控噪声的来源}
+
+\subsection{定子铁芯}
+
+定子铁芯由硅钢片叠压而成，其\textbf{槽数}决定了绕组的基本节距。
+
+\textbf{对你控制的影响}：
+\begin{itemize}
+  \item 槽数越多，齿槽转矩的基波频率越高，力矩脉动越容易被电流环抑制
+  \item 定子铁芯的磁饱和特性决定了\textbf{最大力矩输出时的线性度}
+\end{itemize}
+
+\subsection{集中绕组 vs 分布式绕组}
+
+这是\textbf{最直接影响力控噪声的结构差异}：
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lp{3.5cm}p{3.5cm}p{3.5cm}}
+\toprule
+\textbf{指标} & \textbf{集中绕组} & \textbf{分布式绕组} & \textbf{对控制的影响} \\
+\midrule
+齿槽转矩 & 较大 & 较小 & 集中绕组低速力控噪声大 \\
+反电势谐波 & 丰富 & 干净 & 集中绕组力矩观测误差大 \\
+端部长度 & 短 & 长 & 分布式绕组轴向更长 \\
+铜损 & 较低 & 较高 & --- \\
+热分布 & 不均匀 & 均匀 & 影响Kt温度漂移 \\
+成本 & 低 & 高 & --- \\
+\bottomrule
+\end{tabular}
+\caption{集中绕组 vs 分布式绕组}
+\label{tab:winding}
+\end{table}
+
+\begin{debugbox}{低速力控噪声定位}
+如果你的机器人关节在\textbf{低速}（$< 0.5$ rad/s）力控时出现周期性力矩波动，\\
+频率与电机电频率一致——你看到的是\textbf{绕组结构导致的齿槽转矩}，不是算法问题。
+\end{debugbox}
+
+\section{气隙——最容易被忽视的误差源}
+
+气隙是定子与转子之间的空气间隙，通常为0.3--1.0 mm。
+
+\subsection{气隙对控制的影响}
+
+\begin{equation}
+T(i, \theta) = K_t(\theta) \cdot i
+\end{equation}
+
+$K_t(\theta)$ 在气隙均匀时是常数；但气隙不均匀时，$K_t$ 变成位置的函数。
+
+\subsection{气隙不均匀的三种典型模式}
+
+\begin{enumerate}
+  \item \textbf{偏心}（转子中心与定子中心不重合）：
+  \begin{itemize}
+    \item 导致$K_t$随转子角度周期性变化
+    \item 频率=1倍电频率
+    \item 体现为\textbf{力矩偏移}——你发一个恒力矩指令，实际输出在波动
+  \end{itemize}
+  \item \textbf{椭圆度}（定子或转子变形）：
+  \begin{itemize}
+    \item 导致$K_t$变化频率=2倍电频率
+    \item 更难被控制环补偿
+  \end{itemize}
+  \item \textbf{局部凸起}（制造缺陷）：
+  \begin{itemize}
+    \item 导致特定角度下的力矩突变
+    \item 这是动力学辨识中\textbf{异常数据点}的常见来源
+  \end{itemize}
+\end{enumerate}
+
+\begin{cautionbox}{气隙误差对动力学辨识的干扰}
+做动力学辨识时，如果你发现某些角度下的辨识残差始终偏大，\\
+排查顺序：\\
+1. 先排除编码器安装偏心（最常见）\\
+2. 再排查电机气隙误差\\
+3. 最后才是减速器问题\\
+因为气隙误差的频率特征（1倍/2倍电频率）和减速器误差频率完全不同，可以区分。
+\end{cautionbox}
+
+\section{磁钢装配误差与低速力控死区}
+
+\subsection{磁钢安装误差}
+
+永磁体在转子上的安装位置偏差，会导致：
+
+\begin{itemize}
+  \item \textbf{力矩常数$K_t$的批次差异}：同一型号不同电机，$K_t$可能差3--5\%
+  \item \textbf{反电势不平衡}：三相反电动势幅值不一致，导致力矩脉动
+  \item \textbf{每转一次的力矩波动}：一块磁钢偏了，每转一圈该位置力矩就偏一次
+\end{itemize}
+
+\subsection{低速力控死区}
+
+当电机转速极低（$<0.1$ rad/s）时，齿槽转矩和磁钢误差导致的力矩波动\textbf{与摩擦力矩同级}：
+
+\begin{equation}
+T_{\text{ripple}} \approx T_{\text{cogging}} + T_{\text{error}} \approx 5\text{--}10\% T_{\text{rated}}
+\end{equation}
+
+而摩擦力矩 $T_{\text{friction}} \approx 5\text{--}15\% T_{\text{rated}}$（取决于轴承预紧和润滑）。
+
+\begin{keyinsight}{低速力控死区的物理原因}
+在低速下，你\textbf{无法区分}"力矩指令被摩擦力抵消"和"力矩指令被齿槽转矩抵消"。\\
+这是\textbf{物理极限}，不是算法能解决的。\\
+解决方案：要么提高转速（做动/动态任务），要么加力矩传感器做闭环。
+\end{keyinsight}
+
+\section{轴系与轴承}
+
+虽然轴系和轴承是纯机械部件，但它们对控制的影响不可忽视：
+
+\begin{itemize}
+  \item \textbf{轴承摩擦力矩}：
+  \begin{itemize}
+    \item 与温度、润滑、预紧力相关
+    \item 低温启动时摩擦力矩可达到额定值30\%
+    \item 这是\textbf{电流环积分饱和}的常见原因
+  \end{itemize}
+  \item \textbf{轴系扭转刚度}：
+  \begin{itemize}
+    \item 电机轴本身的扭转柔性，在高带宽力控时引入谐振
+    \item 与负载惯量共同决定\textbf{机械谐振频率}
+  \end{itemize}
+\end{itemize}
+
+\section{电机结构误差对控制的综合影响}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{cp{3cm}p{3.5cm}p{3.5cm}}
+\toprule
+\textbf{结构误差} & \textbf{频率特征} & \textbf{对控制的影响} & \textbf{能否补偿} \\
+\midrule
+气隙偏心 & 1$\times$电频率 & 力矩周期性偏移 & 部分（前馈补偿表） \\
+磁钢偏差 & 1$\times$机械转 & 每转力矩波动 & 部分 \\
+绕组不对称 & 2$\times$电频率 & 力矩脉动增加 & 困难 \\
+轴承摩擦 & 非周期/随机 & 低速死区、积分饱和 & 部分（摩擦补偿） \\
+齿槽转矩 & 槽数$\times$机械转 & 低速抖动 & 部分 \\
+\bottomrule
+\end{tabular}
+\caption{电机结构误差对控制的影响汇总}
+\label{tab:motor_errors}
+\end{table}
+
+\begin{engineeringbox}{动力学辨识必须知道的误差来源}
+做动力学辨识时，你拟合的摩擦力模型、惯性参数中，\\
+\textbf{有相当一部分"参数"实际上是在拟合电机本体的制造误差}。\\
+这就是为什么同样型号的两个电机，辨识出来的参数不一致——\\
+因为\textbf{它们的磁钢安装误差、气隙均匀度不一样}。
+\end{engineeringbox}
+
+\section*{本章小结}
+\addcontentsline{toc}{section}{本章小结}
+
+\begin{summarybox}{}
+\begin{enumerate}
+  \item 集中绕组 vs 分布式绕组——后者力控噪声更低，但成本更高
+  \item \textbf{气隙不均匀}是力矩偏移的常见物理原因，频率特征=1$\times$电频率
+  \item \textbf{磁钢装配误差}导致$K_t$的批次差异和每转力矩波动
+  \item \textbf{低速力控死区}是齿槽转矩+摩擦力的综合效果，是物理极限
+  \item 动力学辨识的残差中，有一部分\textbf{本质上是电机本体的制造误差}
+\end{enumerate}
+\end{summarybox}
+
+\newpage

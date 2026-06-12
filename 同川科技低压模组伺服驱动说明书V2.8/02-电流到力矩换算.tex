@@ -1,0 +1,292 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{ctex}
+\usepackage{amsmath,amssymb}
+\usepackage{geometry}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage{hyperref}
+
+\geometry{a4paper, margin=2.5cm}
+
+\title{从电流到输出端力矩的完整计算推导}
+\author{基于同川科技TCHR低压伺服模组说明书}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\section{概述}
+
+本文件梳理从驱动器内部电流采样到最终输出端关节力矩的完整换算链路，
+涵盖所有涉及的EtherCAT对象地址和物理公式。
+
+\section{第一步：电流采样与坐标变换}
+
+驱动器内部硬件实时采样电机三相电流 \(I_u, I_v, I_w\)。
+通过 Clarke 变换和 Park 变换，将三相静止坐标系下的电流转换到转子旋转坐标系：
+
+\begin{equation}
+\begin{aligned}
+\text{Clarke变换:}&\quad
+\begin{bmatrix}
+I_\alpha \\ I_\beta
+\end{bmatrix}
+=
+\frac{2}{3}
+\begin{bmatrix}
+1 & -\frac{1}{2} & -\frac{1}{2} \\
+0 & \frac{\sqrt{3}}{2} & -\frac{\sqrt{3}}{2}
+\end{bmatrix}
+\begin{bmatrix}
+I_u \\ I_v \\ I_w
+\end{bmatrix}
+\\[8pt]
+\text{Park变换:}&\quad
+\begin{bmatrix}
+I_d \\ I_q
+\end{bmatrix}
+=
+\begin{bmatrix}
+\cos\theta & \sin\theta \\
+-\sin\theta & \cos\theta
+\end{bmatrix}
+\begin{bmatrix}
+I_\alpha \\ I_\beta
+\end{bmatrix}
+\end{aligned}
+\end{equation}
+
+其中 \(\theta\) 为电机转子电角度（可从0x3002读取）。
+
+对于表贴式永磁同步电机（SPMSM），只有交轴电流 \(I_q\) 产生转矩，
+直轴电流 \(I_d\) 通常控制为0。
+
+\section{第二步：电流到电机电磁扭矩}
+
+\subsection{转矩常数 \(K_t\)}
+
+利用驱动器存储的额定参数计算转矩常数：
+
+\begin{equation}
+K_t = \frac{ \text{\texttt{0x6076}} \times 0.001\ \text{Nm} }
+            { \text{\texttt{0x6075}} \times 0.1\ \text{A} }
+\qquad (\text{Nm/A})
+\end{equation}
+
+其中：
+\begin{itemize}
+  \item \texttt{0x6075} (Motor rated current)：电机额定电流，单位 0.1\,A
+  \item \texttt{0x6076} (Motor rated torque)：电机额定扭矩，单位 0.001\,Nm
+\end{itemize}
+
+\subsection{电机电磁扭矩}
+
+\begin{equation}
+\boxed{\, \tau_{\text{motor}} = K_t \times I_q \,}
+\qquad (\text{Nm})
+\end{equation}
+
+驱动器内部实时完成此计算，并将结果以百分比形式映射到 \texttt{0x6077}：
+
+\begin{equation}
+\text{\texttt{0x6077}} = \frac{\tau_{\text{motor}}}{\tau_{\text{rated}}} \times 1000
+\qquad (\text{单位：0.1\%})
+\end{equation}
+
+因此主站也可以直接从对象字典读数换算：
+
+\begin{equation}
+\boxed{\, \tau_{\text{motor}} =
+\frac{\text{\texttt{0x6077}} \times \text{\texttt{0x6076}} \times 0.001}{1000}
+\,}
+\qquad (\text{Nm})
+\end{equation}
+
+或者等价地：
+
+\begin{equation}
+\tau_{\text{motor}} =
+\text{\texttt{0x6077}} \times 0.001 \times (\text{\texttt{0x6076}} \times 0.001)
+\end{equation}
+
+\section{第三步：扭矩指令值 vs 实际值}
+
+驱动器内部控制链中存在两个关键扭矩值：
+
+\begin{itemize}
+  \item \texttt{0x6074} (Torque demand value)：\textbf{扭矩指令值}
+        ——位置环/速度环运算后发给电流环的目标值（前馈+反馈）。
+  \item \texttt{0x6077} (Torque actual value)：\textbf{扭矩实际值}
+        ——从实际电流采样估算出的电机当前电磁扭矩。
+\end{itemize}
+
+两者关系如图\ref{fig:torque_chain}所示。
+
+\begin{equation}
+\text{稳态时:}\quad \text{\texttt{0x6074}} \approx \text{\texttt{0x6077}}
+\qquad
+\text{动态时:}\quad \text{\texttt{0x6074}} \neq \text{\texttt{0x6077}}
+\end{equation}
+
+\begin{figure}[h]
+\centering
+\begin{minipage}{0.85\textwidth}
+\centering
+\framebox[\textwidth]{
+\begin{minipage}{0.9\textwidth}
+\vspace{8pt}
+\textbf{驱动器内部扭矩控制链：}\\[6pt]
+$\underbrace{\text{主站下发}}_{
+\text{\texttt{0x6071}}}
+\rightarrow
+\underbrace{\text{轨迹规划/前馈}}_{
+\text{\texttt{0x60B2}}}
+\rightarrow
+\underbrace{\text{\texttt{0x6074}}}_{\substack{\text{扭矩指令}\\\text{(给电流环)}}}
+\rightarrow
+\underbrace{\text{电流环 PI 调节器}}_{\substack{I_q\text{指令}}}
+\rightarrow
+\underbrace{\text{电机}}_{\substack{\text{输出扭矩}}}
+\rightarrow
+\underbrace{\text{\texttt{0x6077}}}_{\substack{\text{扭矩实际}\\\text{(从电流采样)}}}$
+\vspace{8pt}
+\end{minipage}
+}
+\end{minipage}
+\caption{扭矩控制链路}
+\label{fig:torque_chain}
+\end{figure}
+
+\section{第四步：减速机增扭}
+
+\begin{equation}
+\boxed{\,
+\tau_{\text{output}} =
+\tau_{\text{motor}} \times N \times \eta
+\,}
+\qquad (\text{Nm})
+\end{equation}
+
+其中：
+\begin{itemize}
+  \item \(N\) —— 减速比（可通过 \texttt{0x3D06} PrD.06 获取/设置）
+  \item \(\eta\) —— 传动效率，谐波减速机一般在 60\%~90\% 之间，
+        随负载、温度、转速变化
+\end{itemize}
+
+\subsection{各型号理论输出扭矩}
+
+以 TCHR 系列为例，假设效率 \(\eta = 0.8\)：
+
+\[
+\begin{array}{c|c|c|c|c}
+\hline
+\text{型号} & \text{电机额定扭矩} & \text{减速比} & \text{理论输出扭矩} & \text{实际输出扭矩}(\eta=0.8) \\
+\hline
+\text{TCHR-14} & 0.32\ \text{Nm} & 51 & 16.3\ \text{Nm} & 13.1\ \text{Nm} \\
+\text{TCHR-17} & 0.45\ \text{Nm} & 81 & 36.5\ \text{Nm} & 29.2\ \text{Nm} \\
+\text{TCHR-20} & 1.0\ \text{Nm}  & 101 & 101\ \text{Nm}  & 80.8\ \text{Nm} \\
+\text{TCHR-25} & 1.7\ \text{Nm}  & 121 & 205.7\ \text{Nm} & 164.6\ \text{Nm} \\
+\text{TCHR-32} & 3.6\ \text{Nm}  & 161 & 579.6\ \text{Nm} & 463.7\ \text{Nm} \\
+\hline
+\end{array}
+\]
+
+\section{完整计算流程}
+
+\begin{equation}
+\boxed{
+\begin{aligned}
+\tau_{\text{output}} &=
+\underbrace{\Bigg( \frac{
+\overbrace{\text{\texttt{0x6077}}}^{\text{扭矩实际值(0.1\%)}}
+\times
+\overbrace{\text{\texttt{0x6076}}}^{\text{额定扭矩(0.001Nm)}} \times 0.001
+}{1000} \Bigg)}_{\text{电机实际扭矩 (Nm)}}
+\times
+\underbrace{N}_{\text{减速比}}
+\times
+\underbrace{\eta}_{\text{效率}}
+\end{aligned}
+}
+\end{equation}
+
+或者更简洁地写为：
+
+\begin{equation}
+\boxed{\,
+\tau_{\text{output}} =
+\text{\texttt{0x6077}} \times
+\text{\texttt{0x6076}} \times
+N \times \eta \times 10^{-6}
+\,}
+\qquad (\text{Nm})
+\end{equation}
+
+\section{位置/速度/扭矩换算对比}
+
+\begin{equation}
+\begin{aligned}
+\text{输出端位置} &= \text{电机端位置} / N \\[4pt]
+\text{输出端速度} &= \text{电机端速度} / N \\[4pt]
+\text{输出端扭矩} &= \text{电机端扭矩} \times N \times \eta
+\end{aligned}
+\end{equation}
+
+\begin{table}[h]
+\centering
+\caption{减速机两侧物理量换算关系}
+\begin{tabular}{lccc}
+\toprule
+\textbf{物理量} & \textbf{电机侧读出} & \textbf{换算方向} & \textbf{输出端值} \\
+\midrule
+位置 & 电机端角度 (\( \times N \)) & \(\div N\) & 输出端角度 \\
+速度 & 电机端转速 (\( \times N \)) & \(\div N\) & 输出端转速 \\
+扭矩 & 电机端扭矩 & \(\times N \times \eta\) & 输出端扭矩 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{使用扭矩传感器的直接读取}
+
+如果模块配备输出端扭矩传感器，可直接读取，无需估算：
+
+\begin{equation}
+\begin{aligned}
+\text{\texttt{0x303A}} &: \text{扭矩传感器值 (0.01\,Nm)} \\
+\text{\texttt{0x303C}} &: \text{扭矩传感器值 (0.1\%)}
+\end{aligned}
+\end{equation}
+
+此时输出端扭矩：
+
+\begin{equation}
+\tau_{\text{output}} = \text{\texttt{0x303A}} \times 0.01\ \text{Nm}
+\end{equation}
+
+\section{关键对象字典汇总}
+
+\begin{table}[h]
+\centering
+\caption{涉及的EtherCAT对象地址}
+\begin{tabular}{cllc}
+\toprule
+\textbf{地址} & \textbf{名称} & \textbf{单位} & \textbf{作用} \\
+\midrule
+0x6071 & Target torque & 0.1\% & 下发目标扭矩 \\
+0x6074 & Torque demand value & 0.1\% & 读取扭矩指令值 \\
+0x6075 & Motor rated current & 0.1\,A & 读取额定电流（常量） \\
+0x6076 & Motor rated torque & 0.001\,Nm & 读取额定扭矩（常量） \\
+0x6077 & Torque actual value & 0.1\% & 读取实际扭矩 \\
+0x60B2 & Torque offset & 0.1\% & 扭矩前馈偏移 \\
+0x60E0 & Positive Torque Limit & 0.1\% & 正方向扭矩限制 \\
+0x60E1 & Negative Torque Limit & 0.1\% & 反方向扭矩限制 \\
+0x3002 & 当前电角度 & 0.1° & 用于坐标变换 \\
+0x303A & 扭矩传感器值 & 0.01\,Nm & 输出端扭矩（如有传感器） \\
+0x3D06 & 减速比 & — & 读取/设置减速比 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\end{document}

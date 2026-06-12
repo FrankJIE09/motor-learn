@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>减速器专题 - 传动系统底层原理</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  background: #0a0e17;
+  color: #e0e6f0;
+  line-height: 1.7;
+}
+.hero {
+  background: linear-gradient(135deg, #1a1808 0%, #2a2410 50%, #1a1a0a 100%);
+  padding: 80px 20px 60px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+.hero::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle at 50% 50%, rgba(255,180,0,0.06) 0%, transparent 50%);
+  animation: pulse 8s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 0.3; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(1.1); }
+}
+.hero h1 {
+  font-size: 2.8em;
+  font-weight: 800;
+  background: linear-gradient(135deg, #ffcc40, #ff8800);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  position: relative;
+  letter-spacing: 2px;
+  margin-bottom: 16px;
+}
+.hero p {
+  font-size: 1.15em;
+  color: #a09070;
+  max-width: 700px;
+  margin: 0 auto;
+  position: relative;
+  line-height: 1.8;
+}
+.system-map {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 40px 20px;
+}
+.section-title {
+  text-align: center;
+  font-size: 1.6em;
+  font-weight: 700;
+  margin-bottom: 12px;
+  color: #c0b890;
+}
+.section-subtitle {
+  text-align: center;
+  color: #7a7050;
+  margin-bottom: 40px;
+  font-size: 1em;
+}
+.module-grid {
+  display: grid;
+  gap: 24px;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+}
+.module-card {
+  background: linear-gradient(145deg, #1a1a12, #222218);
+  border-radius: 16px;
+  border: 1px solid #2a2a1a;
+  overflow: hidden;
+  transition: transform 0.3s, box-shadow 0.3s;
+}
+.module-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px rgba(255,150,0,0.10);
+  border-color: #4a3a1a;
+}
+.model-viewer {
+  width: 100%;
+  height: 280px;
+  background: #0d0d08;
+}
+.model-viewer iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+.card-content {
+  padding: 24px;
+}
+.module-badge {
+  display: inline-block;
+  padding: 3px 12px;
+  border-radius: 20px;
+  font-size: 0.78em;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+.badge-planetary { background: rgba(255,180,0,0.15); color: #ffc040; }
+.badge-harmonic { background: rgba(0,200,255,0.15); color: #40d0ff; }
+.badge-qdd { background: rgba(0,220,120,0.15); color: #40e890; }
+.badge-worm { background: rgba(200,100,255,0.15); color: #c080ff; }
+.badge-backlash { background: rgba(255,80,80,0.15); color: #ff7070; }
+.badge-compare { background: rgba(255,140,0,0.15); color: #ffa040; }
+.card-content h3 {
+  font-size: 1.25em;
+  font-weight: 700;
+  margin-bottom: 8px;
+  color: #d0c8a0;
+}
+.card-content p {
+  font-size: 0.92em;
+  color: #8a8a6a;
+  margin-bottom: 12px;
+}
+.key-formula {
+  background: rgba(200,140,0,0.08);
+  border-left: 3px solid #cc8800;
+  padding: 10px 16px;
+  border-radius: 0 8px 8px 0;
+  margin: 10px 0;
+  font-family: 'Courier New', monospace;
+  font-size: 0.9em;
+  color: #e0b040;
+}
+.stats-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+.stat-item {
+  background: rgba(255,255,255,0.04);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 0.82em;
+  color: #7a7a5a;
+}
+.stat-item strong { color: #b0a880; }
+.flow-section {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 50px 20px;
+}
+.flow-title {
+  text-align: center;
+  font-size: 1.5em;
+  font-weight: 700;
+  margin-bottom: 30px;
+  color: #c0b080;
+}
+.flow-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.flow-node {
+  background: linear-gradient(145deg, #1e1e12, #282818);
+  border: 1px solid #3a3a1a;
+  border-radius: 12px;
+  padding: 14px 22px;
+  text-align: center;
+  min-width: 100px;
+  transition: all 0.3s;
+}
+.flow-node:hover {
+  border-color: #886622;
+  transform: translateY(-2px);
+}
+.flow-node .icon { font-size: 1.6em; margin-bottom: 4px; }
+.flow-node .label { font-size: 0.82em; color: #8a8a6a; font-weight: 600; }
+.flow-node .sub { font-size: 0.72em; color: #5a5a3a; margin-top: 2px; }
+.flow-arrow {
+  font-size: 1.4em;
+  color: #5a4a2a;
+  flex-shrink: 0;
+}
+.case-section {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 50px 20px;
+}
+.case-grid {
+  display: grid;
+  gap: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+}
+.case-card {
+  background: linear-gradient(145deg, #1a1a12, #222218);
+  border: 1px solid #2a2a1a;
+  border-radius: 14px;
+  padding: 24px;
+  transition: border-color 0.3s;
+}
+.case-card:hover { border-color: #4a3a1a; }
+.case-card h4 {
+  font-size: 1.1em;
+  margin-bottom: 8px;
+  color: #c0b890;
+}
+.case-card .spec {
+  font-size: 0.85em;
+  color: #7a7a5a;
+  margin-bottom: 4px;
+}
+.case-card .spec strong { color: #a0a070; }
+.compact-table {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px 20px 50px;
+  overflow-x: auto;
+}
+.compact-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88em;
+  min-width: 700px;
+}
+.compact-table th {
+  background: rgba(200,140,0,0.1);
+  padding: 12px 16px;
+  text-align: center;
+  font-weight: 600;
+  color: #d0b860;
+  border-bottom: 2px solid #4a3a1a;
+}
+.compact-table td {
+  padding: 10px 16px;
+  text-align: center;
+  border-bottom: 1px solid #1e1e10;
+  color: #9a9a7a;
+}
+.compact-table tr:hover td {
+  background: rgba(200,140,0,0.05);
+}
+.footer {
+  text-align: center;
+  padding: 40px 20px;
+  color: #4a4a2a;
+  font-size: 0.85em;
+  border-top: 1px solid #1a1a0e;
+}
+@media (max-width: 768px) {
+  .hero h1 { font-size: 1.8em; }
+  .module-grid { grid-template-columns: 1fr; }
+  .flow-container { gap: 4px; }
+  .flow-node { padding: 10px 14px; min-width: 70px; }
+  .flow-arrow { font-size: 1em; }
+  .model-viewer { height: 220px; }
+}
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <h1>减速器 · 精密传动系统</h1>
+  <p>从直驱到高减速比 — 行星齿轮 · 谐波减速器 · 准直驱 · 蜗轮蜗杆 · 误差分析与选型</p>
+</div>
+
+<div class="system-map">
+  <h2 class="section-title">传动方案总览</h2>
+  <p class="section-subtitle">点击/拖拽 3D 模型查看各类减速器结构</p>
+
+  <div class="module-grid">
+
+    <!-- 模块 1: 行星减速器 -->
+    <div class="module-card">
+      <div class="model-viewer">
+        <iframe src="https://sketchfab.com/models/a7e002360fb84534ac4d276d94147da0/embed?autostart=1&internal=1&tracking=0&ui_ar=0&ui_infos=0&ui_snapshots=0&ui_stop=0&ui_theatre=0&ui_watermark=0&ui_hint=2&autospin=0.2" allow="autoplay; fullscreen" allowfullscreen></iframe>
+      </div>
+      <div class="card-content">
+        <span class="module-badge badge-planetary">行星齿轮</span>
+        <h3>行星减速器 (Planetary Gear)</h3>
+        <p>太阳轮、行星轮、内齿圈同轴布置，功率密度高。多级串联可达到高减速比。广泛应用于机器人关节、工业传动。</p>
+        <div class="key-formula">i = 1 + Z<sub>ring</sub> / Z<sub>sun</sub> &nbsp; η = 90–97%</div>
+        <div class="stats-row">
+          <span class="stat-item"><strong>减速比</strong> 3:1–100:1</span>
+          <span class="stat-item"><strong>级数</strong> 1–3 级</span>
+          <span class="stat-item"><strong>背隙</strong> 3–10 arcmin</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 模块 2: 谐波减速器 -->
+    <div class="module-card">
+      <div class="model-viewer">
+        <iframe src="https://sketchfab.com/models/9e05993e1ef24ff2a8ea2107b45765d0/embed?autostart=1&internal=1&tracking=0&ui_ar=0&ui_infos=0&ui_snapshots=0&ui_stop=0&ui_theatre=0&ui_watermark=0&ui_hint=2&autospin=0.2" allow="autoplay; fullscreen" allowfullscreen></iframe>
+      </div>
+      <div class="card-content">
+        <span class="module-badge badge-harmonic">谐波减速器</span>
+        <h3>Harmonic Drive 应变波齿轮</h3>
+        <p>柔轮 (Flexspline) 通过波发生器产生弹性变形，与刚轮 (Circular Spline) 啮合实现零背隙传动。单级可达超大减速比。</p>
+        <div class="key-formula">i = Z<sub>CS</sub> / (Z<sub>CS</sub> − Z<sub>FS</sub>) &nbsp; K ≈ 10<sup>3</sup>–10<sup>4</sup> Nm/rad</div>
+        <div class="stats-row">
+          <span class="stat-item"><strong>减速比</strong> 30–160</span>
+          <span class="stat-item"><strong>效率</strong> 70–85%</span>
+          <span class="stat-item"><strong>背隙</strong> 0 (零)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 模块 3: 准直驱 QDD -->
+    <div class="module-card">
+      <div class="model-viewer">
+        <iframe src="https://sketchfab.com/models/9902b8a13da047e792bb2c22747073c5/embed?autostart=1&internal=1&tracking=0&ui_ar=0&ui_infos=0&ui_snapshots=0&ui_stop=0&ui_theatre=0&ui_watermark=0&ui_hint=2&autospin=0.2" allow="autoplay; fullscreen" allowfullscreen></iframe>
+      </div>
+      <div class="card-content">
+        <span class="module-badge badge-qdd">准直驱 QDD</span>
+        <h3>Quasi-Direct Drive 准直驱</h3>
+        <p>低减速比 (6:1–15:1) 行星减速 + 大转矩电机。反向驱动性好，力控带宽高，适用于动态性能要求高的足式机器人。</p>
+        <div class="key-formula">T<sub>out</sub> = T<sub>motor</sub> · i · η &nbsp; (i = 6–15)</div>
+        <div class="stats-row">
+          <span class="stat-item"><strong>减速比</strong> 6–15:1</span>
+          <span class="stat-item"><strong>效率</strong> 85–95%</span>
+          <span class="stat-item"><strong>代表</strong> MIT Cheetah, H1</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 模块 4: 直驱 -->
+    <div class="module-card">
+      <div class="model-viewer">
+        <iframe src="https://sketchfab.com/models/2926b5bfc3d342d988dc1baf06c8aa84/embed?autostart=1&internal=1&tracking=0&ui_ar=0&ui_infos=0&ui_snapshots=0&ui_stop=0&ui_theatre=0&ui_watermark=0&ui_hint=2&autospin=0.2" allow="autoplay; fullscreen" allowfullscreen></iframe>
+      </div>
+      <div class="card-content">
+        <span class="module-badge badge-qdd">直驱 DD</span>
+        <h3>Direct Drive 直接驱动</h3>
+        <p>电机转子直接连接负载，无中间传动环节。i=1:1，效率 ≈ 100%，完全无背隙。但需要电机自身输出极大转矩，转矩密度较低。</p>
+        <div class="key-formula">T<sub>out</sub> = T<sub>motor</sub> &nbsp; ω<sub>out</sub> = ω<sub>motor</sub> &nbsp; η ≈ 100%</div>
+        <div class="stats-row">
+          <span class="stat-item"><strong>减速比</strong> 1:1</span>
+          <span class="stat-item"><strong>效率</strong> ≈ 100%</span>
+          <span class="stat-item"><strong>背隙</strong> 0</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 模块 5: 蜗轮蜗杆 -->
+    <div class="module-card">
+      <div class="model-viewer">
+        <iframe src="https://sketchfab.com/models/4895686178204874b61a3afa3a51d535/embed?autostart=1&internal=1&tracking=0&ui_ar=0&ui_infos=0&ui_snapshots=0&ui_stop=0&ui_theatre=0&ui_watermark=0&ui_hint=2&autospin=0.2" allow="autoplay; fullscreen" allowfullscreen></iframe>
+      </div>
+      <div class="card-content">
+        <span class="module-badge badge-worm">差速器 / 蜗轮</span>
+        <h3>蜗轮蜗杆 &amp; 差速传动</h3>
+        <p>蜗杆带动蜗轮实现垂直轴传动和大减速比。具有自锁特性（取决于导程角）。差速器用于车辆轮间转矩分配。</p>
+        <div class="stats-row">
+          <span class="stat-item"><strong>减速比</strong> 5–100:1</span>
+          <span class="stat-item"><strong>效率</strong> 50–85%</span>
+          <span class="stat-item"><strong>自锁</strong> 可能</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 模块 6: 误差放大效应 -->
+    <div class="module-card">
+      <div class="model-viewer">
+        <iframe src="https://sketchfab.com/models/66b2ea9eb6e5468d91d814395036a537/embed?autostart=1&internal=1&tracking=0&ui_ar=0&ui_infos=0&ui_snapshots=0&ui_stop=0&ui_theatre=0&ui_watermark=0&ui_hint=2&autospin=0.2" allow="autoplay; fullscreen" allowfullscreen></iframe>
+      </div>
+      <div class="card-content">
+        <span class="module-badge badge-backlash">误差放大</span>
+        <h3>减速比 → 误差放大效应</h3>
+        <p>高减速比会线性放大电机侧的转矩脉动、摩擦力矩、K<sub>t</sub> 波动和传感器噪声。i=121 时，0.01 Nm 的电机误差放大为 1.21 Nm 的输出误差。</p>
+        <div class="key-formula">∆T<sub>out</sub> = i × (∆T<sub>cogging</sub> + ∆T<sub>friction</sub> + ∆T<sub>Kt</sub> + ∆T<sub>noise</sub>)</div>
+        <div class="stats-row">
+          <span class="stat-item"><strong>i≤25</strong> 5–10% 误差</span>
+          <span class="stat-item"><strong>i≥80</strong> 30–50% 误差</span>
+          <span class="stat-item"><strong>K<sub>t</sub></strong> 3–5% 漂移</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="compact-table">
+  <h2 style="text-align:center;font-size:1.4em;margin-bottom:24px;color:#c0b080;">四大减速方案核心参数对比</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>参数</th>
+        <th>直驱 DD</th>
+        <th>准直驱 QDD</th>
+        <th>行星齿轮</th>
+        <th>谐波减速器</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>减速比 i</strong></td>
+        <td>1:1</td>
+        <td>6:1 – 15:1</td>
+        <td>3:1 – 100:1</td>
+        <td>30:1 – 160:1</td>
+      </tr>
+      <tr>
+        <td><strong>效率 η</strong></td>
+        <td>≈ 100%</td>
+        <td>85–95%</td>
+        <td>90–97%</td>
+        <td>70–85%</td>
+      </tr>
+      <tr>
+        <td><strong>背隙</strong></td>
+        <td>0</td>
+        <td>&lt; 1 arcmin</td>
+        <td>3–10 arcmin</td>
+        <td>0</td>
+      </tr>
+      <tr>
+        <td><strong>刚度 K</strong></td>
+        <td>极高</td>
+        <td>高</td>
+        <td>中</td>
+        <td>10<sup>3</sup>–10<sup>4</sup> Nm/rad</td>
+      </tr>
+      <tr>
+        <td><strong>反向驱动</strong></td>
+        <td>极好</td>
+        <td>好</td>
+        <td>一般</td>
+        <td>差–中</td>
+      </tr>
+      <tr>
+        <td><strong>转矩密度</strong></td>
+        <td>低 (0.5–1 Nm/kg)</td>
+        <td>中 (1–2 Nm/kg)</td>
+        <td>高 (3–5 Nm/kg)</td>
+        <td>高 (3–6 Nm/kg)</td>
+      </tr>
+      <tr>
+        <td><strong>力控精度</strong></td>
+        <td>&lt; 1%</td>
+        <td>5–10%</td>
+        <td>5–15%</td>
+        <td>&lt; 1% (需力传感器)</td>
+      </tr>
+      <tr>
+        <td><strong>典型应用</strong></td>
+        <td>高精度平台</td>
+        <td>足式机器人</td>
+        <td>工业传动</td>
+        <td>机器人关节</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="flow-section">
+  <h2 class="flow-title">⚙️ 传动系统选型流程</h2>
+  <div class="flow-container">
+    <div class="flow-node"><div class="icon">🎯</div><div class="label">需求分析</div><div class="sub">转矩/转速/精度</div></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node"><div class="icon">📐</div><div class="label">目标减速比</div><div class="sub">i = N<sub>in</sub>/N<sub>out</sub></div></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node"><div class="icon">🔍</div><div class="label">i ≤ 25?</div><div class="sub">→ QDD / 行星</div></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node"><div class="icon">🔍</div><div class="label">25 &lt; i &lt; 80?</div><div class="sub">→ 行星+谐波</div></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node"><div class="icon">🔍</div><div class="label">i ≥ 80?</div><div class="sub">→ 谐波/多级</div></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node"><div class="icon">✅</div><div class="label">力控验证</div><div class="sub">误差/带宽检查</div></div>
+  </div>
+</div>
+
+<div class="case-section">
+  <h2 class="section-title">工程案例分析</h2>
+  <p class="section-subtitle">减速比选型对力控精度的影响 (i=10 vs i=121)</p>
+  <div class="case-grid">
+    <div class="case-card">
+      <h4>⚡ 低减速方案 (i=10)</h4>
+      <div class="spec"><strong>电机转矩</strong> 0.1 Nm → 输出 1.0 Nm</div>
+      <div class="spec"><strong>K<sub>t</sub> 漂移</strong> 3% → 输出误差 3%</div>
+      <div class="spec"><strong>齿槽转矩</strong> 0.005 Nm → 输出 0.05 Nm</div>
+      <div class="spec"><strong>摩擦</strong> 5–10% 额定转矩</div>
+      <div class="spec"><strong>总误差</strong> 5–10% ← 可接受</div>
+    </div>
+    <div class="case-card">
+      <h4>🔴 高减速方案 (i=121)</h4>
+      <div class="spec"><strong>电机转矩</strong> 0.01 Nm → 输出 1.21 Nm</div>
+      <div class="spec"><strong>K<sub>t</sub> 漂移</strong> 3% → 输出误差 3% (绝对值放大121倍)</div>
+      <div class="spec"><strong>齿槽转矩</strong> 0.005 Nm → 输出 0.605 Nm</div>
+      <div class="spec"><strong>摩擦</strong> 10–20% 额定转矩</div>
+      <div class="spec"><strong>总误差</strong> 30–50% ← 需力传感器</div>
+    </div>
+    <div class="case-card">
+      <h4>🛠️ 关键参数解析</h4>
+      <div class="spec"><strong>减速器摩擦</strong> T<sub>friction, gearbox</sub> ≈ 5–20% T<sub>rated</sub></div>
+      <div class="spec"><strong>摩擦特性</strong> Stribeck 曲线，2–3% 静摩擦跳变</div>
+      <div class="spec"><strong>反射惯量</strong> J<sub>reflected</sub> = J<sub>load</sub> / i²</div>
+      <div class="spec"><strong>i=121</strong> 惯量反射到电机侧 ≈ 1/14641</div>
+      <div class="spec"><strong>谐振</strong> 1–3 kHz，相位滞后控制受限</div>
+    </div>
+  </div>
+</div>
+
+<div class="footer">
+  <p>基于《电机与传动系统底层原理》第3章 · 3D 模型来源于 Sketchfab (CC 许可)</p>
+  <p>行星齿轮 · 谐波减速器 · 差速器 · 步进电机 · 直流电机 · 异步电机</p>
+</div>
+
+</body>
+</html>
