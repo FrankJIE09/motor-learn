@@ -12,8 +12,13 @@
 *.ilg
 *.synctex.gz
 
-# 生成的 PDF（原始的源 PDF 也忽略，太大）
-*.pdf
+# LaTeX 编译生成的 PDF
+电机与传动系统底层原理_book/main.pdf
+同川科技低压模组伺服驱动说明书V2.8/build/*.pdf
+
+# 第三方电子书（大体积，非项目源码）
+电机学 第七版*.pdf
+电机学（第三版）*.pdf
 
 # build 输出目录
 **/build/
