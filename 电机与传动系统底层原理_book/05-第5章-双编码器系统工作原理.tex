@@ -77,6 +77,109 @@ T_{\text{joint}} = K_{\text{stiffness}} \times (\theta_m/i - \theta_j) = K_{\tex
 在良好的校准下，双编码器力矩估计精度可达\textbf{2--5\%额定力矩}，\\接近低精度力矩传感器的水平。
 \end{engineeringbox}
 
+\subsection{刚度$K_{\text{stiffness}}$的标定方法}
+
+$K_{\text{stiffness}}$是双编码器力矩估计中\textbf{最关键也最容易引入误差}的参数。以下是获取$K_{\text{stiffness}}$的几种途径。
+
+\subsubsection{方法一：从减速器手册查表}
+
+这是最直接的方式。减速器厂商通常会在规格书中给出扭转刚度：
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lc}
+\toprule
+\textbf{减速器类型} & \textbf{典型刚度范围（N·m/rad）} \\
+\midrule
+RV减速器 & $10^5 \sim 10^6$ \\
+谐波减速器 & $10^3 \sim 10^5$ \\
+行星减速器 & $10^4 \sim 10^5$ \\
+\bottomrule
+\end{tabular}
+\caption{常见减速器扭转刚度典型值}
+\label{tab:typical_stiffness}
+\end{table}
+
+以谐波减速器CSF-25为例，其扭转刚度约为$1.2 \times 10^4$ N·m/rad；\newline
+RV-40E约为$2.5 \times 10^5$ N·m/rad。实际值需查阅对应型号的手册。
+
+\subsubsection{方法二：实验标定}
+
+获取$K_{\text{stiffness}}$最准确的方式是实验标定：
+
+\begin{enumerate}
+  \item 锁定关节输出端（使$\theta_j = 0$）
+  \item 在电机端施加一系列已知力矩$T_m$
+  \item 读取双编码器，记录每次的$\Delta\theta = \theta_m/i - \theta_j$
+  \item 绘制$T_m$对$\Delta\theta$的散点图，进行线性拟合
+\end{enumerate}
+
+\begin{equation}
+T_m = K_{\text{stiffness}} \cdot \Delta\theta + T_{\text{friction}}
+\label{eq:stiffness_fit}
+\end{equation}
+
+拟合得到的\textbf{斜率}即为$K_{\text{stiffness}}$。
+
+\begin{cautionbox}{摩擦力补偿}
+低速时摩擦会吃掉一部分力矩，使得单次测量偏差较大。\\
+建议在多个不同电流值（力矩）下采集数据点，\\通过\textbf{最小二乘线性拟合}消除摩擦力的影响，\\而不是仅靠单点测量。
+\end{cautionbox}
+
+\subsubsection{方法三：归一化仿真假设}
+
+在研发早期或仿真阶段，如果无法获取精确的$K_{\text{stiffness}}$，\newline
+可以先采用一个合理假设值观察柔性效应，待原型机完成后重新标定。
+
+\section{电机力矩常数$K_t$的获取}
+
+在标定$K_{\text{stiffness}}$的实验步骤中，\textbf{"施加已知力矩$T_m$"}指的是电机的电磁力矩。\newline
+它通过电机力矩常数$K_t$和q轴电流$I_q$计算得到：
+
+\begin{equation}
+T_m = K_t \times I_q
+\label{eq:torque_current}
+\end{equation}
+
+因此，$K_t$的准确性直接决定了$K_{\text{stiffness}}$的标定精度。
+
+\subsection{查手册获取}
+
+电机制造商通常会在规格书中给出力矩常数，单位一般为N·m/A或mN·m/A：
+
+\begin{equation}
+K_t = 0.12\ \text{N·m/A} \quad \text{（示例值）}
+\label{eq:kt_example}
+\end{equation}
+
+\subsection{从额定参数反算}
+
+如果手册中没有直接给出$K_t$，可以通过额定参数估算：
+
+\begin{equation}
+K_t = \frac{60 \times P_{\text{rated}}}{2\pi \times n_{\text{rated}} \times I_{\text{rated}}}
+\label{eq:kt_calc}
+\end{equation}
+
+其中：
+\begin{itemize}
+  \item $P_{\text{rated}}$——额定功率（W）
+  \item $n_{\text{rated}}$——额定转速（rpm）
+  \item $I_{\text{rated}}$——额定电流（A）
+  \item $K_t$——力矩常数（N·m/A）
+\end{itemize}
+
+\subsection{关于转矩常数与反电动势常数的关系}
+
+对于永磁同步电机，在SI单位制下，力矩常数$K_t$与反电动势常数$K_e$在数值上相等：
+
+\begin{equation}
+K_t\ [\text{N·m/A}] = K_e\ [\text{V·s/rad}]
+\label{eq:kt_ke}
+\end{equation}
+
+因此，如果手册给出了反电动势常数，也可以直接作为$K_t$使用。
+
 \subsection{动力学滤波}
 
 直接差分得到的$\Delta\theta$含有噪声，需要滤波：
